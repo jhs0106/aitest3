@@ -1,0 +1,56 @@
+server:
+  port: 8445
+  ssl:
+    enabled: true
+    key-store: classpath:keystore.p12
+    key-store-password: ENC(idIWCdznEM3ggslDeTmLJw==)
+    key-store-type: PKCS12
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+spring:
+  config:
+    import: optional:file:.env[.properties] #.env import
+  mvc:
+    view:
+      prefix: /views/
+      suffix: .jsp
+  datasource:
+    url: jdbc:postgresql://localhost:5432/postgres
+    username: postgres
+    password: ENC(AZD/oOYNtCPlDC68dabOeA==)
+  ai:
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+    openai:
+      #      api-key: ENC(+FnIWM0i4a3zH84yUlW52xumf48u6k0skXOzULTQE2rY552u1LanL4r4azV4+0wj)
+      #      chat:
+      #        options:
+      #          model: gemini-2.0-flash
+      #          temperature: 0.0
+      #          max-tokens: 1000
+      #        completions-path: /v1/chat/completions
+      #        base-url: https://generativelanguage.googleapis.com/v1beta/openai/
+      api-key: ENC(+T9SWaH75QZqZr5jsSY/GPfYhyJSiku54nYHGBHzq2D8M6Ri7sq3QXgWNzqalZw1kxI4ewSWJ5sbOH0zCQt6418r05/ShuliVIYKCWLIZtjMAOwzahzqKH+vtkWOlu2v5C3XBYdZYl2/14oOWDyR6yjYFNOTyCBOpxAEphIYS2SVMLqr6rTbFFN1RpBFs4Iko7C3Lmx1PdzADzBqyCezj4u+2PCSYN4ChZKtLrY7QnI=)
+      chat:
+        options:
+          model: gpt-4o
+          temperature: 0.1
+          max-tokens: 1000
+mybatis:
+  type-aliases-package: edu.sm.app.dto
+  mapper-locations: classpath:/mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+logging:
+  level:
+    root: info
+
+# Application Config
+# @Value("${}")
+app:
+  key:
+    skey: ${MY_KEY}

@@ -4,7 +4,7 @@ import edu.sm.app.dto.CounselingRequest;
 import edu.sm.app.dto.CounselingResponse;
 import edu.sm.app.dto.SurveyRecord;
 import edu.sm.app.dto.SurveySubmission;
-import lombok.RequiredArgsConstructor;
+
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.document.Document;
@@ -26,7 +26,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class SurveyRagService {
 
     private static final DateTimeFormatter DISPLAY_FORMATTER =
@@ -34,6 +33,11 @@ public class SurveyRagService {
 
     private final VectorStore vectorStore;
     private final ChatClient chatClient;
+
+    public SurveyRagService(VectorStore vectorStore, ChatClient.Builder chatClientBuilder) {
+        this.vectorStore = vectorStore;
+        this.chatClient = chatClientBuilder.build();
+    }
 
     public String storeSurvey(SurveySubmission submission) {
         Instant now = Instant.now();

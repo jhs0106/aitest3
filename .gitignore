@@ -1,1 +1,6 @@
 /.idea/
+/aipilot/.gradle/
+/aipilot/build/
+.env
+.env/
+/.env

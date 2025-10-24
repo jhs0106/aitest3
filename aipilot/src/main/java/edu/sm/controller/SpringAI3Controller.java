@@ -37,6 +37,5 @@ public class SpringAI3Controller {
         model.addAttribute("left", dir+"left");
         return "index";
     }
-
-
+    
 }

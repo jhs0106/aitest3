@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="edu.sm.app.mapper.DoorUserMapper">
+
+    <insert id="insertUser" parameterType="doorUser">
+        INSERT INTO door_user (name, face_signature)
+        VALUES (#{name}, #{faceSignature})
+    </insert>
+
+    <select id="findUserByName" parameterType="String" resultType="doorUser">
+        SELECT id, name, face_signature
+        FROM door_user
+        WHERE name = #{name}
+            LIMIT 1
+    </select>
+
+    <select id="findAllUsers" resultType="doorUser">
+        SELECT id, name, face_signature
+        FROM door_user
+        ORDER BY name
+    </select>
+
+    <insert id="insertAccessRecord" parameterType="doorAccessRecord">
+        INSERT INTO door_access_record (name, status, access_time)
+        VALUES (#{name}, #{status}, CURRENT_TIMESTAMP)
+    </insert>
+
+    <select id="findAllRecords" resultType="doorAccessRecord">
+        SELECT id, name, status, access_time
+        FROM door_access_record
+        ORDER BY access_time DESC
+    </select>
+
+</mapper>

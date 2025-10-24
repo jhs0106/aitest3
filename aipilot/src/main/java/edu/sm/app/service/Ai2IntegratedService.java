@@ -86,16 +86,33 @@ public class Ai2IntegratedService {
     // ===== 텍스트 명령 처리 =====
     public Map<String, String> processTextCommand(
             String command, String conversationId) {
-        String result = executeIotCommand(command, conversationId);
-        return Map.of("result", result);
+        try {
+            log.info("텍스트 명령 수신: {}", command);
+            String result = executeIotCommand(command, conversationId);
+            log.info("텍스트 명령 처리 완료 - command: {}, result: {}", command, result);
+
+            Map<String, String> response = new HashMap<>();
+            response.put("command", command);  // ← 이 줄이 핵심!
+            response.put("result", result != null ? result : "응답을 생성하지 못했습니다.");
+            return response;
+        } catch (Exception e) {
+            log.error("텍스트 명령 처리 중 오류 발생: command={}", command, e);
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("command", command);
+            errorResponse.put("result", "명령 처리 중 오류가 발생했습니다.");
+            return errorResponse;
+        }
     }
 
     // ===== IoT 명령 실행 =====
     private String executeIotCommand(String command, String conversationId) {
-        ChatClient chatClient = chatClientBuilder.build();
+        try {
+            log.info("IoT 명령 실행 시작 - command: {}, conversationId: {}", command, conversationId);
 
-        String answer = chatClient.prompt()
-                .system("""
+            ChatClient chatClient = chatClientBuilder.build();
+
+            String answer = chatClient.prompt()
+                    .system("""
                         당신은 스마트홈 AI 어시스턴트입니다.
                         사용자의 명령을 분석하여 적절한 IoT 기기를 제어하세요.
                         
@@ -108,18 +125,31 @@ public class Ai2IntegratedService {
                         이전 대화를 기억하며 사용자 선호도를 학습하세요.
                         응답은 간결하고 친절하게 한국어로 작성하세요.
                         """)
-                .user(command)
-                .tools(ai2IotTools)
-                .advisors(
-                        PromptChatMemoryAdvisor.builder(chatMemory).build(),
-                        new SimpleLoggerAdvisor(Ordered.LOWEST_PRECEDENCE - 1)
-                )
-                .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, conversationId))
-                .call()
-                .content();
+                    .user(command)
+                    .tools(ai2IotTools)
+                    .advisors(
+                            PromptChatMemoryAdvisor.builder(chatMemory).build(),
+                            new SimpleLoggerAdvisor(Ordered.LOWEST_PRECEDENCE - 1)
+                    )
+                    .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, conversationId))
+                    .call()
+                    .content();
 
-        return answer;
+            // ✅ 수정: null 체크 및 기본값 제공
+            if (answer == null || answer.trim().isEmpty()) {
+                log.warn("AI 응답이 비어있음 - command: {}", command);
+                return "명령을 처리했지만 응답을 생성하지 못했습니다.";
+            }
+
+            log.info("IoT 명령 실행 완료 - answer 길이: {}", answer.length());
+            return answer;
+
+        } catch (Exception e) {
+            log.error("IoT 명령 실행 중 오류 발생 - command: {}", command, e);
+            return "명령 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+        }
     }
+
 
     // ===== RAG 검색 =====
     public String searchManual(String question) {

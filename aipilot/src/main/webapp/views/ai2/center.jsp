@@ -12,7 +12,11 @@
             $('#sendTextBtn').click(() => {
                 this.sendTextCommand();
             });
-            // 5초마다 센서 데이터 갱신
+            $('#textCommand').keypress((e) => {
+                if(e.which === 13) {
+                    this.sendTextCommand();
+                }
+            });
             setInterval(() => {
                 this.loadSensorData();
             }, 5000);
@@ -27,7 +31,6 @@
                     $('#humidity').text(data.humidity + '%');
                     $('#light').text(data.light + ' lux');
 
-                    // 온도에 따른 색상 변경
                     if(data.temperature >= 26) {
                         $('#tempCard').removeClass('border-primary border-success').addClass('border-danger');
                     } else if(data.temperature >= 20) {
@@ -56,6 +59,7 @@
         handleVoice: function(mp3Blob) {
             const formData = new FormData();
             formData.append('speech', mp3Blob, 'voice.mp3');
+            const self = this;
 
             $.ajax({
                 url: '/ai2/api/voice-control',
@@ -63,8 +67,12 @@
                 data: formData,
                 processData: false,
                 contentType: false,
-                success: (response) => {
-                    this.addHistory('음성', response.command, response.result);
+                success: function(response) {
+                    console.log('음성 명령 응답:', response);
+                    const command = response.command || '(명령 없음)';
+                    const result = response.result || '(결과 없음)';
+                    self.addHistory('음성', command, result);
+
                     if(response.audio) {
                         const audio = new Audio('data:audio/mp3;base64,' + response.audio);
                         audio.play();
@@ -72,8 +80,9 @@
                     $('#voiceSpinner').hide();
                     $('#voiceBtn').prop('disabled', false);
                 },
-                error: (err) => {
+                error: function(err) {
                     console.error('음성 명령 실패:', err);
+                    self.addHistory('음성', '(오류)', '음성 명령 처리 중 오류가 발생했습니다.');
                     $('#voiceSpinner').hide();
                     $('#voiceBtn').prop('disabled', false);
                 }
@@ -88,39 +97,60 @@
             }
 
             $('#sendTextBtn').prop('disabled', true);
+            const self = this;
 
             $.ajax({
                 url: '/ai2/api/text-control',
                 method: 'POST',
                 data: { command: command },
-                success: (response) => {
-                    this.addHistory('텍스트', command, response.result);
+                success: function(response) {
+                    console.log('텍스트 명령 응답:', response);
+                    const result = response.result || '(결과 없음)';
+                    self.addHistory('텍스트', command, result);
                     $('#textCommand').val('');
                     $('#sendTextBtn').prop('disabled', false);
                 },
-                error: (err) => {
+                error: function(err) {
                     console.error('텍스트 명령 실패:', err);
+                    self.addHistory('텍스트', command, '명령 처리 중 오류가 발생했습니다.');
                     $('#sendTextBtn').prop('disabled', false);
                 }
             });
         },
 
         addHistory: function(type, command, result) {
+            console.log('addHistory 호출됨 - type:', type, 'command:', command, 'result:', result);
+
             const now = new Date().toLocaleTimeString('ko-KR');
             const badge = type === '음성' ? 'badge-primary' : 'badge-success';
-            const historyItem = `
-                <div class="media border p-3 mb-2">
-                    <div class="media-body">
-                        <h6><span class="badge ${badge}">${type}</span> ${now}</h6>
-                        <p class="mb-1"><strong>명령:</strong> ${command}</p>
-                        <p class="mb-0 text-muted"><strong>결과:</strong> ${result}</p>
-                    </div>
-                </div>
-            `;
-            $('#history').prepend(historyItem);
+
+            const safeCommand = command || '(명령 정보 없음)';
+            const safeResult = result || '(결과 정보 없음)';
+
+            // ✅ 핵심 수정: jQuery로 DOM 요소 직접 생성
+            const $historyItem = $('<div>').addClass('media border p-3 mb-2');
+            const $mediaBody = $('<div>').addClass('media-body');
+
+            const $header = $('<h6>');
+            const $badge = $('<span>').addClass('badge ' + badge).text(type);
+            $header.append($badge).append(' ' + now);
+
+            const $commandP = $('<p>').addClass('mb-1');
+            $commandP.append($('<strong>').text('명령: ')).append(safeCommand);
+
+            const $resultP = $('<p>').addClass('mb-0 text-muted');
+            $resultP.append($('<strong>').text('결과: ')).append(safeResult);
+
+            $mediaBody.append($header).append($commandP).append($resultP);
+            $historyItem.append($mediaBody);
+
+            $('#history p.text-center').remove();
+            $('#history').prepend($historyItem);
 
             // 최대 5개까지만 보여주기
             $('#history .media').slice(5).remove();
+
+            console.log('이력 추가 완료');
         }
     };
 

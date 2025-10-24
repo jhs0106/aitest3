@@ -16,6 +16,20 @@
             $('#clearVectorBtn').click(() => {
                 this.clearVectorStore();
             });
+
+            // ✅ Enter 키 이벤트 추가
+            $('#ragQuestion').keypress((e) => {
+                if(e.which === 13) {
+                    this.searchManual();
+                }
+            });
+
+            $('#memoryMessage').keypress((e) => {
+                if(e.which === 13) {
+                    this.sendMemoryChat();
+                }
+            });
+
             this.loadDeviceStatus();
         },
 
@@ -27,22 +41,30 @@
                 return;
             }
 
-            $('#ragResult').html('<div class="spinner-border text-primary"></div>');
+            const $spinner = $('<div>').addClass('spinner-border text-primary');
+            $('#ragResult').empty().append($spinner);
 
             $.ajax({
                 url: '/ai2/api/rag-search',
                 method: 'POST',
                 data: { question: question },
                 success: (response) => {
-                    $('#ragResult').html(`
-                        <div class="alert alert-success">
-                            <h6>📚 검색 결과</h6>
-                            <p>${response.answer}</p>
-                        </div>
-                    `);
+                    console.log('RAG 검색 응답:', response);
+
+                    $('#ragResult').empty();
+
+                    const $alert = $('<div>').addClass('alert alert-success');
+                    const $title = $('<h6>').text('📚 검색 결과');
+                    const $content = $('<p>').text(response.answer || '검색 결과가 없습니다.');
+
+                    $alert.append($title).append($content);
+                    $('#ragResult').append($alert);
                 },
                 error: (err) => {
-                    $('#ragResult').html('<div class="alert alert-danger">검색 실패</div>');
+                    console.error('RAG 검색 실패:', err);
+                    $('#ragResult').empty();
+                    const $error = $('<div>').addClass('alert alert-danger').text('검색 실패: ' + (err.responseText || '알 수 없는 오류'));
+                    $('#ragResult').append($error);
                 }
             });
         },
@@ -55,47 +77,82 @@
                 return;
             }
 
+            console.log('메시지 전송:', message);
+
             // 사용자 메시지 추가
             this.addChatMessage('user', message);
             $('#memoryMessage').val('');
 
-            // AI 응답 받기 (스트리밍)
-            const eventSource = new EventSource('/ai2/api/memory-chat?message=' + encodeURIComponent(message));
+            // ✅ AI 응답 받기 (EventSource 수정)
+            const url = '/ai2/api/memory-chat?message=' + encodeURIComponent(message);
+            console.log('EventSource URL:', url);
+
+            const eventSource = new EventSource(url);
             let aiMessage = '';
 
             const messageId = 'ai-' + Date.now();
-            this.addChatMessage('ai', '<span id="' + messageId + '"></span>');
+            const $aiSpan = $('<span>').attr('id', messageId).text('');
+            this.addChatMessage('ai', $aiSpan);
 
             eventSource.onmessage = (event) => {
+                console.log('스트리밍 데이터:', event.data);
                 aiMessage += event.data;
                 $('#' + messageId).text(aiMessage);
             };
 
-            eventSource.onerror = () => {
+            eventSource.onerror = (error) => {
+                console.error('EventSource 오류:', error);
                 eventSource.close();
+                if(!aiMessage) {
+                    $('#' + messageId).text('응답을 받지 못했습니다. 다시 시도해주세요.');
+                }
             };
+
+            // ✅ 10초 후 자동 종료
+            setTimeout(() => {
+                eventSource.close();
+                console.log('EventSource 종료');
+            }, 10000);
         },
 
+        // ✅ 채팅 메시지 추가 (jQuery로 DOM 생성)
         addChatMessage: function(role, content) {
-            const isUser = role === 'user';
-            const className = isUser ? 'bg-primary text-white' : 'bg-light';
-            const align = isUser ? 'text-right' : '';
+            console.log('메시지 추가 - role:', role, 'content:', content);
 
-            const message = `
-                <div class="${align} mb-2">
-                    <span class="badge ${className} p-2" style="display: inline-block; max-width: 70%;">
-                        ${content}
-                    </span>
-                </div>
-            `;
-            $('#chatMessages').append(message);
+            const isUser = role === 'user';
+            const badgeClass = isUser ? 'bg-primary text-white' : 'bg-light';
+            const alignClass = isUser ? 'text-right' : '';
+
+            const $messageDiv = $('<div>').addClass(alignClass + ' mb-2');
+            const $badge = $('<span>')
+                    .addClass('badge ' + badgeClass + ' p-2')
+                    .css({
+                        'display': 'inline-block',
+                        'max-width': '70%',
+                        'word-wrap': 'break-word'
+                    });
+
+            // content가 jQuery 객체인 경우와 문자열인 경우 구분
+            if(content instanceof jQuery) {
+                $badge.append(content);
+            } else {
+                $badge.text(content);
+            }
+
+            $messageDiv.append($badge);
+
+            // 초기 메시지 제거
+            $('#chatMessages p.text-center').remove();
+            $('#chatMessages').append($messageDiv);
+
+            // 스크롤을 맨 아래로
             $('#chatMessages').scrollTop($('#chatMessages')[0].scrollHeight);
         },
 
         // 문서 업로드
         uploadDocument: function() {
             const file = $('#docFile')[0].files[0];
-            const type = $('#docType').val();
+            const type = $('#docType').val().trim();
 
             if(!file) {
                 alert('파일을 선택해주세요.');
@@ -104,9 +161,10 @@
 
             const formData = new FormData();
             formData.append('attach', file);
-            formData.append('type', type);
+            formData.append('type', type || 'general');
 
-            $('#uploadStatus').html('<div class="spinner-border text-primary"></div>');
+            const $spinner = $('<div>').addClass('spinner-border text-primary');
+            $('#uploadStatus').empty().append($spinner);
 
             $.ajax({
                 url: '/ai2/api/upload-document',
@@ -115,13 +173,21 @@
                 processData: false,
                 contentType: false,
                 success: (response) => {
-                    $('#uploadStatus').html(`
-                        <div class="alert alert-success">${response}</div>
-                    `);
+                    console.log('업로드 성공:', response);
+                    $('#uploadStatus').empty();
+
+                    const $success = $('<div>').addClass('alert alert-success').text(response);
+                    $('#uploadStatus').append($success);
+
                     $('#docFile').val('');
+                    $('#docType').val('');
                 },
                 error: (err) => {
-                    $('#uploadStatus').html('<div class="alert alert-danger">업로드 실패</div>');
+                    console.error('업로드 실패:', err);
+                    $('#uploadStatus').empty();
+
+                    const $error = $('<div>').addClass('alert alert-danger').text('업로드 실패: ' + (err.responseText || '알 수 없는 오류'));
+                    $('#uploadStatus').append($error);
                 }
             });
         },
@@ -137,6 +203,12 @@
                 method: 'POST',
                 success: (response) => {
                     alert(response);
+                    $('#uploadStatus').empty();
+                    const $info = $('<div>').addClass('alert alert-info').text('벡터 저장소가 초기화되었습니다.');
+                    $('#uploadStatus').append($info);
+                },
+                error: (err) => {
+                    alert('삭제 실패: ' + (err.responseText || '알 수 없는 오류'));
                 }
             });
         },
@@ -147,16 +219,22 @@
                 url: '/ai2/api/device-status',
                 method: 'GET',
                 success: (data) => {
+                    console.log('디바이스 상태:', data);
                     this.updateDeviceUI(data);
+                },
+                error: (err) => {
+                    console.error('디바이스 상태 로딩 실패:', err);
                 }
             });
         },
 
         updateDeviceUI: function(data) {
-            // 디바이스 상태 업데이트
-            $('#heatingStatus').text(data.heating ? 'ON' : 'OFF');
-            $('#lightStatus').text(data.light ? 'ON' : 'OFF');
-            $('#ventStatus').text(data.ventilation ? 'ON' : 'OFF');
+            $('#heatingStatus').text(data.heating ? 'ON' : 'OFF')
+                    .css('color', data.heating ? 'green' : 'red');
+            $('#lightStatus').text(data.light ? 'ON' : 'OFF')
+                    .css('color', data.light ? 'green' : 'red');
+            $('#ventStatus').text(data.ventilation ? 'ON' : 'OFF')
+                    .css('color', data.ventilation ? 'green' : 'red');
         }
     };
 
@@ -206,6 +284,10 @@
                 <li>"난방비 절약하는 방법 알려줘"</li>
                 <li>"환기 시스템 점검 주기는?"</li>
             </ul>
+
+            <div class="alert alert-warning mt-3">
+                <strong>⚠️ 참고:</strong> 문서를 먼저 업로드해야 검색이 가능합니다. "문서 업로드" 탭에서 PDF, DOCX, TXT 파일을 업로드하세요.
+            </div>
         </div>
 
         <!-- Memory 탭 -->
@@ -256,9 +338,17 @@
             </div>
 
             <button id="uploadDocBtn" class="btn btn-primary">업로드</button>
-            <button id="clearVectorBtn" class="btn btn-danger">모든 문서 삭제</button>
+            <button id="clearVectorBtn" class="btn btn-danger ml-2">모든 문서 삭제</button>
 
             <div id="uploadStatus" class="mt-3"></div>
+
+            <hr>
+            <h5>업로드 가이드</h5>
+            <ul>
+                <li><strong>PDF:</strong> IoT 기기 사용 설명서</li>
+                <li><strong>DOCX:</strong> 관리 매뉴얼, 주의사항</li>
+                <li><strong>TXT:</strong> FAQ, 간단한 안내문</li>
+            </ul>
         </div>
 
         <!-- 상태 탭 -->
@@ -286,6 +376,10 @@
                 </tr>
                 </tbody>
             </table>
+
+            <div class="alert alert-info">
+                <strong>💡 팁:</strong> 메인 대시보드에서 텍스트/음성 명령으로 디바이스를 제어할 수 있습니다.
+            </div>
         </div>
     </div>
 </div>

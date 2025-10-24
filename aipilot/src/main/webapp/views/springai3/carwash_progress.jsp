@@ -22,9 +22,9 @@
       $('#cw_prog_result').prepend(html);
     }
   }
+  
   $(()=> cw_prog.init());
 </script>
-
 <div class="col-sm-10">
   <h2>세차장 — 진행 상태</h2>
   <div class="row">

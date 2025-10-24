@@ -16,7 +16,7 @@
       const pm10  = $('#cw_plan_pm10').val();
       const rain  = $('#cw_plan_rain').val();
       if(!plate){ alert('번호판을 입력하세요.'); return; }
-      //
+
       $('#cw_plan_spinner').css('visibility','visible');
       $('#cw_plan_recipe').val('');
 
@@ -27,7 +27,7 @@
         headers:{ 'Content-Type': 'application/json', 'Accept':'text/plain' },
         body
       });
-
+      //
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
       let content = '';

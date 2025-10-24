@@ -28,7 +28,19 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
+import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.core.Ordered;
+
 @Service
+@Slf4j
+@RequiredArgsConstructor
 public class SurveyRagService {
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
@@ -36,6 +48,8 @@ public class SurveyRagService {
     private static final Map<String, SelfAssessmentForm> FORM_CATALOG = createFormCatalog();
 
     private final Map<String, List<SurveyRecord>> surveyStore = new ConcurrentHashMap<>();
+    private final VectorStore vectorStore;
+    private final ChatClient.Builder chatClientBuilder;
 
     public List<SelfAssessmentForm> getForms(Optional<String> categoryOptional) {
         if (categoryOptional.isPresent()) {
@@ -142,6 +156,8 @@ public class SurveyRagService {
                 .computeIfAbsent(clientId, key -> new CopyOnWriteArrayList<>())
                 .add(surveyRecord);
 
+        indexSurveyRecord(surveyRecord, form);
+
         return surveyId;
     }
 
@@ -165,7 +181,6 @@ public class SurveyRagService {
 
         return Collections.unmodifiableList(filtered);
     }
-
     public CounselingResponse generateCounseling(CounselingRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("상담 요청이 비어 있습니다.");
@@ -181,80 +196,207 @@ public class SurveyRagService {
         Optional<String> category = Optional.ofNullable(normalize(request.getCategory()));
         List<SurveyRecord> references = findSurveys(clientId, category);
 
-        String advice;
-        if (references.isEmpty()) {
-            advice = "최근 자가 설문 기록이 없어 일반적인 조언을 제공합니다. 질문하신 내용은 '" +
-                    question + "'이며, 정기적으로 자가 테스트를 진행하면 더 맞춤형 안내를 받을 수 있습니다.";
-        } else {
-            SurveyRecord latest = references.get(0);
-            StringBuilder builder = new StringBuilder();
-            builder.append("자가 설문 결과를 참고하여 질문 '")
-                    .append(question)
-                    .append("'에 대해 안내드립니다. ");
+        String filterExpression = buildFilterExpression(clientId, category);
+        SearchRequest searchRequest = SearchRequest.builder()
+                .query(question)
+                .similarityThreshold(0.0)
+                .topK(5)
+                .filterExpression(filterExpression)
+                .build();
 
-            if (latest.getResultLevel() != null) {
-                builder.append("현재 상태는 '")
-                        .append(latest.getResultLevel())
-                        .append("' 단계로 평가되었습니다. ");
-            }
+        QuestionAnswerAdvisor advisor = QuestionAnswerAdvisor.builder(vectorStore)
+                .searchRequest(searchRequest)
+                .build();
 
-            if (latest.getResultSummary() != null) {
-                builder.append("요약: ")
-                        .append(latest.getResultSummary())
-                        .append(". ");
-            }
+        ChatClient chatClient = chatClientBuilder
+                .defaultAdvisors(new SimpleLoggerAdvisor(Ordered.LOWEST_PRECEDENCE - 1))
+                .build();
 
-            if (latest.getTotalScore() != null && latest.getMaxScore() != null && latest.getMaxScore() > 0) {
-                builder.append("점수는 ")
-                        .append(latest.getTotalScore())
-                        .append(" / ")
-                        .append(latest.getMaxScore())
-                        .append("입니다. ");
-            }
+        String userPrompt = buildUserPrompt(question, clientId, category, references);
 
-            if (latest.getResultRecommendation() != null) {
-                builder.append("권장 행동: ")
-                        .append(latest.getResultRecommendation())
-                        .append(". ");
-            }
+        String advice = chatClient.prompt()
+                .system("""
+                        너는 마음건강 상담 전문가다.
+                        제공되는 설문 요약과 사용자의 질문을 활용해 공감적이고 실천 가능한 조언을 한국어로 작성하라.
+                        설문에서 확인되지 않는 내용은 추측하지 말고, 필요한 경우 전문기관이나 추가 상담을 안내하라.
+                        """)
+                .user(userPrompt)
+                .advisors(advisor)
+                .call()
+                .content();
 
-            List<SurveyAnswerRecord> answers = latest.getAnswers() != null ? latest.getAnswers() : List.of();
-            if (!answers.isEmpty()) {
-                List<SurveyAnswerRecord> topConcerns = answers.stream()
-                        .sorted(Comparator.comparingInt((SurveyAnswerRecord a) -> Optional.ofNullable(a.getScore()).orElse(0)).reversed())
-                        .limit(2)
-                        .collect(Collectors.toList());
-
-                if (!topConcerns.isEmpty()) {
-                    builder.append("특히 ");
-                    for (int i = 0; i < topConcerns.size(); i++) {
-                        SurveyAnswerRecord answer = topConcerns.get(i);
-                        if (i > 0) {
-                            builder.append(i == topConcerns.size() - 1 ? " 그리고 " : ", ");
-                        }
-                        builder.append("'")
-                                .append(answer.getQuestionText())
-                                .append("' 문항에서 '")
-                                .append(answer.getSelectedOptionText())
-                                .append("'로 응답하셨습니다");
-                    }
-                    builder.append(". 해당 영역에 조금 더 주의를 기울여 보세요. ");
-                }
-            }
-
-            if (latest.getSelfReflection() != null) {
-                builder.append("자가 소감으로 남긴 '")
-                        .append(latest.getSelfReflection())
-                        .append("'이라는 표현을 다시 한번 떠올려 보세요. ");
-            }
-
-            builder.append("작은 변화라도 실천해 보며, 필요하다면 전문 상담이나 주변의 도움을 요청해 보시길 권장드립니다.");
-            advice = builder.toString();
+        if (advice == null || advice.isBlank()) {
+            advice = buildFallbackAdvice(question, references);
         }
 
         return new CounselingResponse(advice, references.isEmpty() ? null : references);
     }
 
+    private void indexSurveyRecord(SurveyRecord record, SelfAssessmentForm form) {
+        try {
+            Document document = toDocument(record, form);
+            vectorStore.add(List.of(document));
+        } catch (Exception ex) {
+            log.warn("설문 벡터 적재 실패 - surveyId={}, reason={}", record.getSurveyId(), ex.getMessage());
+        }
+    }
+
+    private Document toDocument(SurveyRecord record, SelfAssessmentForm form) {
+        StringBuilder content = new StringBuilder();
+        content.append("설문 요약\n");
+        content.append("clientId: ").append(record.getClientId()).append('\n');
+        content.append("category: ").append(record.getCategory()).append('\n');
+        if (record.getResultLevel() != null) {
+            content.append("level: ").append(record.getResultLevel()).append('\n');
+        }
+        if (record.getResultSummary() != null) {
+            content.append("summary: ").append(record.getResultSummary()).append('\n');
+        }
+        if (record.getResultRecommendation() != null) {
+            content.append("recommendation: ").append(record.getResultRecommendation()).append('\n');
+        }
+        if (record.getTotalScore() != null && record.getMaxScore() != null) {
+            content.append("score: ").append(record.getTotalScore()).append(" / ").append(record.getMaxScore()).append('\n');
+        }
+        if (record.getSelfReflection() != null) {
+            content.append("selfReflection: ").append(record.getSelfReflection()).append('\n');
+        }
+        content.append("answers:\n");
+        List<SurveyAnswerRecord> answers = record.getAnswers() == null ? List.of() : record.getAnswers();
+        for (SurveyAnswerRecord answer : answers) {
+            content.append("- ")
+                    .append(answer.getQuestionText())
+                    .append(" -> ")
+                    .append(answer.getSelectedOptionText());
+            if (answer.getScore() != null) {
+                content.append(" (score=").append(answer.getScore()).append(')');
+            }
+            content.append('\n');
+        }
+
+        if (form != null) {
+            content.append("formTitle: ").append(form.getTitle()).append('\n');
+            if (form.getDescription() != null) {
+                content.append("formDescription: ").append(form.getDescription()).append('\n');
+            }
+        }
+
+        Document document = new Document(content.toString());
+        document.getMetadata().put("type", "survey_record");
+        document.getMetadata().put("surveyId", record.getSurveyId());
+        document.getMetadata().put("clientId", record.getClientId());
+        if (record.getCategory() != null) {
+            document.getMetadata().put("category", record.getCategory());
+        }
+        if (record.getSubmittedAt() != null) {
+            document.getMetadata().put("submittedAt", record.getSubmittedAt());
+        }
+        if (form != null && form.getTitle() != null) {
+            document.getMetadata().put("formTitle", form.getTitle());
+        }
+        return document;
+    }
+
+    private String buildFilterExpression(String clientId, Optional<String> categoryOptional) {
+        StringBuilder filter = new StringBuilder("type == 'survey_record' && clientId == '")
+                .append(escapeQuotes(clientId))
+                .append("'");
+        categoryOptional.ifPresent(cat -> filter.append(" && category == '").append(escapeQuotes(cat)).append("'"));
+        return filter.toString();
+    }
+
+    private String buildUserPrompt(String question,
+                                   String clientId,
+                                   Optional<String> category,
+                                   List<SurveyRecord> references) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("상담 대상 클라이언트: ").append(clientId).append('\n');
+        builder.append("질문: ").append(question).append('\n');
+        builder.append("카테고리: ").append(category.orElse("미지정")).append('\n');
+        if (references.isEmpty()) {
+            builder.append("설문 데이터: 최근 설문 기록이 없습니다. 일반적인 조언을 제공하되, 정기적인 자가 검진을 안내하세요.");
+            return builder.toString();
+        }
+
+        builder.append("최근 설문 기록 요약:\n");
+        references.stream()
+                .limit(3)
+                .forEach(record -> builder.append(formatSurveyRecord(record)).append('\n'));
+
+        builder.append("설문 기반으로 질문에 답변하되, 필요한 후속 조치를 제안하세요.");
+        return builder.toString();
+    }
+
+    private String formatSurveyRecord(SurveyRecord record) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("- 제출일: ").append(Optional.ofNullable(record.getSubmittedAt()).orElse("미상")).append('\n');
+        if (record.getResultLevel() != null) {
+            builder.append("  단계: ").append(record.getResultLevel()).append('\n');
+        }
+        if (record.getResultSummary() != null) {
+            builder.append("  요약: ").append(record.getResultSummary()).append('\n');
+        }
+        if (record.getResultRecommendation() != null) {
+            builder.append("  권장 행동: ").append(record.getResultRecommendation()).append('\n');
+        }
+        List<SurveyAnswerRecord> answers = record.getAnswers() == null ? List.of() : record.getAnswers();
+        if (!answers.isEmpty()) {
+            builder.append("  주요 응답: ");
+            List<SurveyAnswerRecord> top = answers.stream()
+                    .sorted(Comparator.comparingInt((SurveyAnswerRecord a) -> Optional.ofNullable(a.getScore()).orElse(0)).reversed())
+                    .limit(2)
+                    .collect(Collectors.toList());
+            for (int i = 0; i < top.size(); i++) {
+                SurveyAnswerRecord answer = top.get(i);
+                if (i > 0) {
+                    builder.append(i == top.size() - 1 ? " 그리고 " : ", ");
+                }
+                builder.append("'")
+                        .append(answer.getQuestionText())
+                        .append("'→'")
+                        .append(answer.getSelectedOptionText())
+                        .append("'");
+            }
+            builder.append('\n');
+        }
+        if (record.getSelfReflection() != null) {
+            builder.append("  자가 소감: ").append(record.getSelfReflection()).append('\n');
+        }
+        return builder.toString();
+    }
+
+    private String buildFallbackAdvice(String question, List<SurveyRecord> references) {
+        if (references.isEmpty()) {
+            return "최근 자가 설문 기록이 없어 일반적인 조언을 제공합니다. 질문하신 내용은 '" +
+                    question + "'이며, 정기적으로 자가 테스트를 진행하면 더 맞춤형 안내를 받을 수 있습니다.";
+        }
+        SurveyRecord latest = references.get(0);
+        StringBuilder builder = new StringBuilder();
+        builder.append("자가 설문 결과를 참고하여 질문 '")
+                .append(question)
+                .append("'에 대해 안내드립니다. ");
+        if (latest.getResultLevel() != null) {
+            builder.append("현재 상태는 '")
+                    .append(latest.getResultLevel())
+                    .append("' 단계로 평가되었습니다. ");
+        }
+        if (latest.getResultSummary() != null) {
+            builder.append("요약: ")
+                    .append(latest.getResultSummary())
+                    .append(". ");
+        }
+        if (latest.getResultRecommendation() != null) {
+            builder.append("권장 행동: ")
+                    .append(latest.getResultRecommendation())
+                    .append(". ");
+        }
+        builder.append("필요하다면 전문 상담이나 주변의 도움을 요청해 보시길 권장드립니다.");
+        return builder.toString();
+    }
+
+    private String escapeQuotes(String value) {
+        return value == null ? "" : value.replace("'", "''");
+    }
     private Optional<SelfAssessmentGuide> resolveGuide(SelfAssessmentForm form, int totalScore) {
         if (form.getGuides() == null) {
             return Optional.empty();
@@ -446,7 +588,6 @@ public class SurveyRagService {
                 psychologyQuestions,
                 psychologyGuides
         ));
-
         List<SelfAssessmentQuestion> careerQuestions = List.of(
                 new SelfAssessmentQuestion(
                         "career_clarity",

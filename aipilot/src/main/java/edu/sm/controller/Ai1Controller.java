@@ -1,10 +1,10 @@
 package edu.sm.controller;
 
-import edu.sm.dto.CounselingRequest;
-import edu.sm.dto.CounselingResponse;
-import edu.sm.dto.SurveyRecord;
-import edu.sm.dto.SurveySubmission;
-import edu.sm.service.SurveyRagService;
+import edu.sm.app.dto.CounselingRequest;
+import edu.sm.app.dto.CounselingResponse;
+import edu.sm.app.dto.SurveyRecord;
+import edu.sm.app.dto.SurveySubmission;
+import edu.sm.app.service.SurveyRagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;

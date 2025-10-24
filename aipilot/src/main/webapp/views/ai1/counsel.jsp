@@ -2,28 +2,28 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 
 <div class="col-sm-9">
-    <h3 class="mb-3">설문 기반 상담</h3>
-    <p class="text-muted">내담자의 설문 히스토리를 바탕으로 공감적인 상담 답변을 생성합니다.</p>
+    <h3 class="mb-3">자가 설문 기반 상담</h3>
+    <p class="text-muted">본인이 저장한 자가 설문 히스토리를 바탕으로 공감적인 AI 상담 답변을 제공합니다.</p>
 
     <form id="counselForm" class="border rounded p-3 bg-light mb-3">
         <div class="form-row">
             <div class="form-group col-md-4">
-                <label for="counselClientId">내담자 ID</label>
-                <input type="text" class="form-control" id="counselClientId" placeholder="예: client-001" required>
+                <label for="counselClientId">사용자 ID</label>
+                <input type="text" class="form-control" id="counselClientId" placeholder="예: self-001" required>
             </div>
             <div class="form-group col-md-4">
-                <label for="counselCategory">설문 유형</label>
+                <label for="counselCategory">자가 테스트 유형</label>
                 <select id="counselCategory" class="form-control">
                     <option value="">전체</option>
-                    <option value="psychology">심리 상태</option>
+                    <option value="psychology">감정 · 스트레스</option>
                     <option value="career">진로 탐색</option>
                 </select>
-                <small class="form-text text-muted">필요 시 특정 설문 유형만 참조합니다.</small>
+                <small class="form-text text-muted">특정 유형을 고르면 해당 자가 설문만 참고합니다.</small>
             </div>
         </div>
         <div class="form-group">
             <label for="counselQuestion">상담 질문</label>
-            <textarea class="form-control" id="counselQuestion" rows="4" placeholder="내담자의 고민이나 궁금한 점을 구체적으로 작성해 주세요." required></textarea>
+            <textarea class="form-control" id="counselQuestion" rows="4" placeholder="현재 고민이나 조언이 필요한 상황을 구체적으로 적어 주세요." required></textarea>
         </div>
         <button type="submit" id="submitCounsel" class="btn btn-primary">상담 요청</button>
         <div id="counselStatus" class="mt-3" role="alert" style="display:none;"></div>
@@ -41,7 +41,7 @@
 
     <div class="card" id="historySection">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <span>최근 설문 히스토리</span>
+            <span>최근 자가 설문 히스토리</span>
             <div>
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="refreshHistory">새로고침</button>
             </div>
@@ -52,15 +52,16 @@
                 <tr>
                     <th scope="col">작성 일시</th>
                     <th scope="col">유형</th>
-                    <th scope="col">세션 초점</th>
-                    <th scope="col">핵심 관찰</th>
-                    <th scope="col">필요한 지원</th>
-                    <th scope="col">다음 단계</th>
+                    <th scope="col">점수</th>
+                    <th scope="col">결과 등급</th>
+                    <th scope="col">결과 요약</th>
+                    <th scope="col">권장 행동</th>
+                    <th scope="col">자가 소감</th>
                 </tr>
                 </thead>
                 <tbody>
                 <tr>
-                    <td colspan="6" class="text-center text-muted">내담자 ID를 입력하면 설문 히스토리가 표시됩니다.</td>
+                    <td colspan="7" class="text-center text-muted">사용자 ID를 입력하면 자가 설문 히스토리가 표시됩니다.</td>
                 </tr>
                 </tbody>
             </table>
@@ -85,6 +86,11 @@
 
         const surveysApiBase = '<c:url value="/ai1/api/surveys"/>';
         const counselApi = '<c:url value="/ai1/api/counsel"/>';
+
+        const categoryLabels = {
+            psychology: '감정 · 스트레스',
+            career: '진로 탐색 부담도'
+        };
 
         const defaultSubmitLabel = submitButton.textContent;
 
@@ -128,7 +134,7 @@
             if (!references || references.length === 0) {
                 const item = document.createElement('li');
                 item.className = 'list-group-item text-muted';
-                item.textContent = '참조한 설문이 없습니다. 최근 설문을 먼저 저장해 주세요.';
+                item.textContent = '참조한 자가 설문이 없습니다. 자가 설문을 먼저 저장해 주세요.';
                 referencesList.appendChild(item);
                 referencesSection.style.display = 'block';
                 return;
@@ -137,12 +143,29 @@
                 const item = document.createElement('li');
                 item.className = 'list-group-item';
                 const submittedAt = reference.submittedAt ? `(${reference.submittedAt})` : '';
+                const scoreText = (typeof reference.totalScore === 'number' && typeof reference.maxScore === 'number')
+                    ? `${reference.totalScore} / ${reference.maxScore}`
+                    : '점수 정보 없음';
+                const answers = Array.isArray(reference.answers) ? reference.answers : [];
+                const answersHtml = answers.map(answer => {
+                    const answerScore = typeof answer.score === 'number' ? ` (점수 ${answer.score})` : '';
+                    return `<li>${answer.questionText} → ${answer.selectedOptionText}${answerScore}</li>`;
+                }).join('');
+                const reflection = reference.selfReflection ? `<div class="small text-muted">자가 소감: ${reference.selfReflection}</div>` : '';
+                const level = reference.resultLevel ? `<div class="small">결과 등급: ${reference.resultLevel}</div>` : '';
+                const recommendation = reference.resultRecommendation ? `<div class="small text-muted">권장 행동: ${reference.resultRecommendation}</div>` : '';
+                const categoryName = categoryLabels[reference.category] || reference.category || '';
                 item.innerHTML = `
-          <div><strong>${reference.category || ''}</strong> ${submittedAt}</div>
-          <div class="small text-muted">세션 초점: ${reference.sessionFocus || ''}</div>
-          <div class="small text-muted">핵심 관찰: ${reference.keyObservations || ''}</div>
-          <div class="small text-muted">필요한 지원: ${reference.supportNeeds || ''}</div>
-          <div class="small text-muted">다음 단계: ${reference.nextSteps || ''}</div>
+          <div><strong>${categoryName}</strong> ${submittedAt}</div>
+          <div class="small">점수: ${scoreText}</div>
+          <div class="small">요약: ${reference.resultSummary || '요약 정보 없음'}</div>
+          ${level}
+          ${recommendation}
+          ${reflection}
+          <details class="mt-2">
+            <summary class="small text-primary">문항별 응답 보기</summary>
+            <ul class="small pl-3 mb-0">${answersHtml || '<li>응답 정보 없음</li>'}</ul>
+          </details>
         `;
                 referencesList.appendChild(item);
             });
@@ -154,9 +177,9 @@
             if (!hasClientId) {
                 const row = document.createElement('tr');
                 const cell = document.createElement('td');
-                cell.colSpan = 6;
+                cell.colSpan = 7;
                 cell.className = 'text-center text-muted';
-                cell.textContent = '내담자 ID를 입력하면 최근 설문을 확인할 수 있습니다.';
+                cell.textContent = '사용자 ID를 입력하면 최근 자가 설문을 확인할 수 있습니다.';
                 row.appendChild(cell);
                 historyBody.appendChild(row);
                 return;
@@ -164,24 +187,36 @@
             if (!surveys || surveys.length === 0) {
                 const row = document.createElement('tr');
                 const cell = document.createElement('td');
-                cell.colSpan = 6;
+                cell.colSpan = 7;
                 cell.className = 'text-center text-muted';
-                cell.textContent = '저장된 설문이 없습니다. 설문 저장 메뉴에서 먼저 기록해 주세요.';
+                cell.textContent = '저장된 자가 설문이 없습니다. 설문 작성 메뉴에서 먼저 기록해 주세요.';
                 row.appendChild(cell);
                 historyBody.appendChild(row);
                 return;
             }
             surveys.forEach((survey) => {
                 const row = document.createElement('tr');
-                row.innerHTML =
-                    '<td>' + (survey.submittedAt || '') + '</td>' +
-                    '<td>' + (survey.category || '') + '</td>' +
-                    '<td>' + (survey.sessionFocus || '') + '</td>' +
-                    '<td>' + (survey.keyObservations || '') + '</td>' +
-                    '<td>' + (survey.supportNeeds || '') + '</td>' +
-                    '<td>' + (survey.nextSteps || '') + '</td>';
+                const scoreText = (typeof survey.totalScore === 'number' && typeof survey.maxScore === 'number')
+                    ? `${survey.totalScore} / ${survey.maxScore}`
+                    : '';
+                row.appendChild(createCell(survey.submittedAt || ''));
+                row.appendChild(createCell(categoryLabels[survey.category] || survey.category || ''));
+                row.appendChild(createCell(scoreText));
+                row.appendChild(createCell(survey.resultLevel || ''));
+                row.appendChild(createCell(survey.resultSummary || ''));
+                row.appendChild(createCell(survey.resultRecommendation || '', 'text-break'));
+                row.appendChild(createCell(survey.selfReflection || '', 'text-break'));
                 historyBody.appendChild(row);
             });
+        }
+
+        function createCell(text, extraClass) {
+            const cell = document.createElement('td');
+            if (extraClass) {
+                cell.className = extraClass;
+            }
+            cell.textContent = text;
+            return cell;
         }
 
         async function loadHistory() {
@@ -201,7 +236,7 @@
                 const url = query ? baseClientPath + '?' + query : baseClientPath;
                 const response = await fetch(url);
                 if (!response.ok) {
-                    throw new Error('설문을 불러오지 못했습니다.');
+                    throw new Error('자가 설문을 불러오지 못했습니다.');
                 }
                 const data = await response.json();
                 renderHistory(Array.isArray(data) ? data : [], true);
@@ -222,7 +257,7 @@
             };
 
             if (!payload.clientId || !payload.question) {
-                showStatus('내담자 ID와 상담 질문을 입력해 주세요.', 'error');
+                showStatus('사용자 ID와 상담 질문을 입력해 주세요.', 'error');
                 return;
             }
 

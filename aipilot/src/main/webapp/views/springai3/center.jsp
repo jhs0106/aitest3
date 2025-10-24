@@ -4,4 +4,5 @@
 <div class="col-sm-10">
   <h2>AI3 Center Page</h2>
   <h5>Title description, Sep 2, 2017</h5>
+
 </div>

@@ -115,14 +115,13 @@
       }
       surveys.forEach((survey) => {
         const row = document.createElement('tr');
-        row.innerHTML = `
-                    <td>${survey.submittedAt || ''}</td>
-                    <td>${survey.category || ''}</td>
-                    <td>${survey.sessionFocus || ''}</td>
-                    <td>${survey.keyObservations || ''}</td>
-                    <td>${survey.supportNeeds || ''}</td>
-                    <td>${survey.nextSteps || ''}</td>
-                `;
+        row.innerHTML =
+                '<td>' + (survey.submittedAt || '') + '</td>' +
+                '<td>' + (survey.category || '') + '</td>' +
+                '<td>' + (survey.sessionFocus || '') + '</td>' +
+                '<td>' + (survey.keyObservations || '') + '</td>' +
+                '<td>' + (survey.supportNeeds || '') + '</td>' +
+                '<td>' + (survey.nextSteps || '') + '</td>';
         tableBody.appendChild(row);
       });
     }
@@ -139,9 +138,8 @@
       }
       try {
         const queryString = params.toString();
-        const url = queryString
-                ? `${surveysApiBase}/${encodeURIComponent(clientId)}?${queryString}`
-                : `${surveysApiBase}/${encodeURIComponent(clientId)}`;
+        const baseClientPath = surveysApiBase + '/' + encodeURIComponent(clientId);
+        const url = queryString ? baseClientPath + '?' + queryString : baseClientPath;
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error('설문을 조회할 수 없습니다.');

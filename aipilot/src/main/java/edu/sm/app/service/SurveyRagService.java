@@ -67,11 +67,10 @@ public class SurveyRagService {
         if (!StringUtils.hasText(clientId)) {
             return List.of();
         }
-        String query = buildQuery(clientId, category, null);
-        SearchRequest request = SearchRequest.query(query).withTopK(20);
-        List<Document> documents = vectorStore.similaritySearch(request);
-        documents.sort(Comparator.comparing(this::readSubmittedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed());
-        return documents.stream()
+        SearchRequest request = buildSearchRequest(buildQuery(clientId, category, null), 20);
+        return vectorStore.similaritySearch(request).stream()
+                .filter(document -> matches(document, clientId, category))
+                .sorted(Comparator.comparing(this::readSubmittedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
                 .map(this::toRecord)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
@@ -80,15 +79,17 @@ public class SurveyRagService {
     public CounselingResponse generateCounseling(CounselingRequest request) {
         String clientId = request.clientId();
         String question = request.question();
-        Optional<String> category = Optional.ofNullable(StringUtils.hasText(request.category()) ? request.category().trim() : null);
+        Optional<String> category = Optional.ofNullable(
+                StringUtils.hasText(request.category()) ? request.category().trim() : null);
 
         if (!StringUtils.hasText(clientId) || !StringUtils.hasText(question)) {
             return new CounselingResponse("상담을 위해서는 내담자 ID와 질문이 필요합니다.", List.of());
         }
 
-        String query = buildQuery(clientId, category, question);
-        SearchRequest searchRequest = SearchRequest.query(query).withTopK(10);
-        List<Document> documents = vectorStore.similaritySearch(searchRequest);
+        SearchRequest searchRequest = buildSearchRequest(buildQuery(clientId, category, question), 10);
+        List<Document> documents = vectorStore.similaritySearch(searchRequest).stream()
+                .filter(document -> matches(document, clientId, category))
+                .collect(Collectors.toList());
 
         if (documents.isEmpty()) {
             return new CounselingResponse("저장된 설문 기록이 없습니다. 먼저 설문을 입력해 주세요.", List.of());
@@ -121,15 +122,32 @@ public class SurveyRagService {
         if (response == null) {
             return "응답을 생성하지 못했습니다.";
         }
-        String content = response.content();
+        String content = readFirstContent(response);
         if (StringUtils.hasText(content)) {
             return content;
         }
-        if (response.getResult() != null && response.getResult().getOutput() != null
-                && StringUtils.hasText(response.getResult().getOutput().toString())) {
-            return response.getResult().getOutput().toString();
-        }
         return "응답을 생성하지 못했습니다.";
+    }
+
+    private String readFirstContent(ChatResponse response) {
+        if (response == null) {
+            return "";
+        }
+        if (response.getResult() != null && response.getResult().getOutput() != null
+                && StringUtils.hasText(response.getResult().getOutput().getContent())) {
+            return response.getResult().getOutput().getContent();
+        }
+        if (response.getResults() == null) {
+            return "";
+        }
+        return response.getResults().stream()
+                .filter(Objects::nonNull)
+                .map(result -> result.getOutput())
+                .filter(Objects::nonNull)
+                .map(output -> output.getContent())
+                .filter(StringUtils::hasText)
+                .findFirst()
+                .orElse("");
     }
 
     private SurveyRecord toRecord(Document document) {
@@ -201,6 +219,13 @@ public class SurveyRagService {
         return builder.toString();
     }
 
+    private SearchRequest buildSearchRequest(String query, int topK) {
+        return SearchRequest.builder()
+                .query(query)
+                .topK(topK)
+                .build();
+    }
+
     private String sanitize(String value) {
         return StringUtils.hasText(value) ? value.trim() : "";
     }
@@ -243,5 +268,30 @@ public class SurveyRagService {
             }
         }
         return null;
+    }
+
+    private boolean matches(Document document, String clientId, Optional<String> category) {
+        if (document == null || document.getMetadata() == null) {
+            return false;
+        }
+
+        Map<String, Object> metadata = document.getMetadata();
+        String docClientId = value(metadata.get("clientId")).trim();
+        if (!StringUtils.hasText(docClientId)) {
+            return false;
+        }
+
+        if (!docClientId.equalsIgnoreCase(clientId.trim())) {
+            return false;
+        }
+
+        if (category.isPresent()) {
+            String docCategory = value(metadata.get("category")).trim();
+            if (!StringUtils.hasText(docCategory) || !docCategory.equalsIgnoreCase(category.get().trim())) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

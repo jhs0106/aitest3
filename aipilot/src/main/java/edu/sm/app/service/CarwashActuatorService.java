@@ -1,20 +1,21 @@
 package edu.sm.app.service;
 
+import edu.sm.app.tool.CarwashTools;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-
-import org.springframework.beans.factory.annotation.Autowired;
-
+/**
+ * 실제 장비 제어를 호출하는 중간 레이어.
+ * 컨트롤러나 다른 서비스들이 직접 @Tool을 부르지 않고
+ * 이 서비스를 거쳐서 호출할 수 있게 한다.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class CarwashActuatorService {
 
-    // 실제 구현 시 @Tool 메소드들을 모아놓은 빈(예: gateOpen/gateClose/start)
-    @Autowired(required = false)
-    private edu.sm.app.service.CarwashTools carwashTools;
+    private final CarwashTools carwashTools;
 
     public void gateOpen() {
         if (carwashTools != null) {
@@ -31,7 +32,6 @@ public class CarwashActuatorService {
             log.info("[MOCK] gateClose()");
         }
     }
-//
 
     public void startWash(String orderId, String recipeJson) {
         if (carwashTools != null) {

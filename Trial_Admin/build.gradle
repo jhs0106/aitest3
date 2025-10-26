@@ -7,7 +7,7 @@ plugins {
 
 group = 'edu.sm'
 version = '0.0.1-SNAPSHOT'
-description = 'admin'
+description = 'Trial_Admin'
 
 java {
     toolchain {

@@ -106,9 +106,19 @@
 <script>
     let trial = {
         sending: false,
+        sessionId: null,  // 세션 ID
 
         init: function() {
             console.log('=== 모의 법정 초기화 ===');
+
+            // 세션 ID 생성 (브라우저 새로고침해도 유지)
+            this.sessionId = sessionStorage.getItem('trial-session-id');
+            if (!this.sessionId) {
+                this.sessionId = 'trial-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                sessionStorage.setItem('trial-session-id', this.sessionId);
+            }
+            console.log('세션 ID:', this.sessionId);
+
             const chatArea = document.getElementById('trialChatArea');
             console.log('채팅 영역 찾기:', chatArea ? '성공' : '실패');
         },
@@ -201,7 +211,8 @@
         },
 
         fetchAIResponse: function(message, loadingId, sendBtn) {
-            const url = '/ai2/api/trial-chat?message=' + encodeURIComponent(message);
+            const url = '/ai2/api/trial-chat?message=' + encodeURIComponent(message) +
+                    '&sessionId=' + encodeURIComponent(this.sessionId);
             console.log('API 호출:', url);
 
             const eventSource = new EventSource(url);
@@ -302,7 +313,7 @@
         <!-- 헤더 -->
         <div class="trial-header">
             <h2>⚖️ 모의 법정 시스템</h2>
-            <p>AI 판사와 대화해보세요</p>
+            <p>AI 판사와 대화해보세요 <span style="font-size: 0.8em;">🧠 대화 기억 ON</span></p>
         </div>
 
         <!-- 채팅 영역 -->

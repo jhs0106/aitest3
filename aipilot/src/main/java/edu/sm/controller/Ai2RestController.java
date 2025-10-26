@@ -1,6 +1,7 @@
 package edu.sm.controller;
 
 import edu.sm.app.service.Ai2IntegratedService;
+import edu.sm.app.service.TrialService;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,7 @@ import java.util.Map;
 public class Ai2RestController {
 
     private final Ai2IntegratedService ai2IntegratedService;
+    private final TrialService trialService;
 
     @GetMapping("/sensor-data")
     public Map<String, Object> getSensorData() {
@@ -73,5 +75,11 @@ public class Ai2RestController {
     @GetMapping("/device-status")
     public Map<String, Object> getDeviceStatus() {
         return ai2IntegratedService.getDeviceStatus();
+    }
+
+    @GetMapping(value = "/trial-chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> trialChat(@RequestParam("message") String message) {
+        log.info("모의 법정 채팅 - 메시지: {}", message);
+        return trialService.chat(message);
     }
 }

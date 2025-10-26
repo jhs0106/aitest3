@@ -13,6 +13,11 @@
                 <i class="fa fa-lightbulb-o"></i> 스마트홈 제어
             </a>
         </li>
+        <li class="nav-item">
+            <a class="nav-link" href="<c:url value="/ai2/trial"/>">
+                <i class="fa fa-gavel"></i> 모의 법정
+            </a>
+        </li>
     </ul>
     <hr class="d-sm-none">
 </div>

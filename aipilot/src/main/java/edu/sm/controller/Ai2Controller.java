@@ -25,4 +25,11 @@ public class Ai2Controller {
         model.addAttribute("left", dir+"left");
         return "index";
     }
+
+    @RequestMapping("/trial")
+    public String trial(Model model){
+        model.addAttribute("center", dir+"trial");
+        model.addAttribute("left", dir+"left");
+        return "index";
+    }
 }

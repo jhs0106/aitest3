@@ -194,8 +194,8 @@ public class SurveyRagService {
     }
 
     // ====== 조회(저장 이후) ======
-    /**
-     * 특정 clientId (및 선택적 category)로 설문 기록 조회 (최신순 정렬)
+    /*
+      특정 clientId (및 선택적 category)로 설문 기록 조회 (최신순 정렬)
      */
     public List<SurveyRecord> findSurveys(String clientId, Optional<String> category) {
         String normalizedClientId = SurveyRagTools.normalize(clientId);
@@ -220,8 +220,8 @@ public class SurveyRagService {
 
     // ====== 상담 생성(RAG) ======
     /**
-     * 사용자의 질문 + (선택적) 카테고리 + 사용자의 최근 설문을 바탕으로
-     * VectorStore를 조회하고 조언(상담)을 생성
+     사용자의 질문 + (선택적) 카테고리 + 사용자의 최근 설문을 바탕으로
+     VectorStore를 조회하고 조언(상담)을 생성
      */
     public CounselingResponse generateCounseling(CounselingRequest request) {
         if (request == null) {
@@ -259,8 +259,8 @@ public class SurveyRagService {
         String advice = chatClient
                 .prompt()
                 .system("""
-                        너는 마음건강 상담 전문가다.
-                        제공되는 설문 요약과 사용자의 질문을 활용해 공감적이고 실천 가능한 조언을 한국어로 작성하라.
+                        너는 심리 상담 전문가다.
+                        제공되는 설문 요약과 사용자의 질문을 활용해 공감적이고 실천 가능한 조언을 한국어로 작성해라.
                         설문에서 확인되지 않는 내용은 추측하지 말고, 필요한 경우 전문기관이나 추가 상담을 안내하라.
                         """)
                 .user(userPrompt)
@@ -275,8 +275,8 @@ public class SurveyRagService {
         return new CounselingResponse(advice, references.isEmpty() ? null : references);
     }
 
-    // ====== 내부 유틸 ======
-    /** 설문 문서를 VectorStore 에 색인 */
+
+    /*설문 문서를 VectorStore 에 */
     private void indexSurveyRecord(SurveyRecord record, SelfAssessmentForm form) {
         try {
             Document document = toDocument(record, form);

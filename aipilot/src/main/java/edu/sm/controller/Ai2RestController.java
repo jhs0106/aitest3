@@ -22,6 +22,7 @@ public class Ai2RestController {
     private final Ai2IntegratedService ai2IntegratedService;
     private final TrialService trialService;
 
+    // ===== 기존 IoT 관련 엔드포인트 =====
     @GetMapping("/sensor-data")
     public Map<String, Object> getSensorData() {
         return ai2IntegratedService.getSensorData();
@@ -77,9 +78,49 @@ public class Ai2RestController {
         return ai2IntegratedService.getDeviceStatus();
     }
 
+    // ===== 모의 법정 관련 엔드포인트 =====
+
+    /**
+     * 기본 재판 채팅 (기존 메서드 유지)
+     */
     @GetMapping(value = "/trial-chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> trialChat(@RequestParam("message") String message) {
         log.info("모의 법정 채팅 - 메시지: {}", message);
         return trialService.chat(message);
+    }
+
+    /**
+     * Memory 기반 재판 (대화 기록 유지)
+     */
+    @GetMapping(value = "/trial-memory-chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> trialMemoryChat(
+            @RequestParam("message") String message,
+            HttpSession session) {
+        log.info("Memory 재판 - 세션ID: {}, 메시지: {}", session.getId(), message);
+        return trialService.chatWithMemory(message, session.getId());
+    }
+
+    /**
+     * RAG 기반 법률 자문
+     */
+    @GetMapping(value = "/legal-advice", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> legalAdvice(
+            @RequestParam("question") String question,
+            @RequestParam(value = "lawType", required = false) String lawType) {
+        log.info("법률 자문 - 유형: {}, 질문: {}", lawType, question);
+        return trialService.getLegalAdvice(question, lawType);
+    }
+
+    /**
+     * Memory + RAG 통합 재판
+     */
+    @GetMapping(value = "/trial-full", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> trialFull(
+            @RequestParam("message") String message,
+            @RequestParam(value = "lawType", required = false) String lawType,
+            HttpSession session) {
+        log.info("통합 재판 - 세션ID: {}, 법률유형: {}, 메시지: {}",
+                session.getId(), lawType, message);
+        return trialService.chatWithMemoryAndRag(message, session.getId(), lawType);
     }
 }

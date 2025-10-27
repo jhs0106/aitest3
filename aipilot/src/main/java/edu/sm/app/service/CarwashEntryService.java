@@ -1,7 +1,5 @@
 package edu.sm.app.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -12,22 +10,57 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MimeType;
 
-import edu.sm.app.tool.VehicleCheckTools;
-import edu.sm.app.tool.CarwashTools;
-
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class CarwashEntryService {
 
     private final ChatModel chatModel;
-    private final VehicleCheckTools vehicleCheckTools;
-    private final CarwashTools carwashTools;
-    private final CarwashPlanService carwashPlanService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final JdbcCarRegistry jdbcCarRegistry;
+    private final BarrierControlService barrierControlService;
+    private final GateLogService gateLogService;
 
-    public EntryResult handleEntry(String contentType, byte[] bytes) throws Exception {
+    /**
+     * 입차 처리:
+     *  1) 번호판 인식
+     *  2) vehicle 테이블에서 기존고객 여부 확인
+     *  3) 차단봉 올릴지 / 내릴지 결정
+     *  4) ENTRY 로그 기록
+     *  5) plate, known, barrier 상태를 반환
+     */
+    public EntryResult handleEntryImage(String contentType, byte[] imageBytes) {
 
+        // 1. 번호판 인식 (LLM 비전)
+        String plate = recognizePlate(contentType, imageBytes);
+
+        // 2. 기존고객 여부: vehicle 테이블 확인
+        boolean known = jdbcCarRegistry.isKnownCar(plate);
+
+        // (선택) 만약 신규 고객도 vehicle에 저장해 두고 싶으면:
+        // jdbcCarRegistry.upsertVehicleOnEntry(plate);
+
+        // 3. 차단봉 제어
+        if (known) {
+            barrierControlService.up();      // 기존 고객이면 바로 열어준다
+        } else {
+            barrierControlService.down();    // 신규면 일단 닫아둔다(혹은 열어도 되고 정책에 따라)
+        }
+
+        // 4. 입차 로그 기록 (ENTRY)
+        gateLogService.logEntry(plate);
+
+        // 5. 결과 DTO 구성
+        EntryResult result = new EntryResult();
+        result.setPlate(plate);
+        result.setKnown(known);
+        result.setBarrier(known ? "UP" : "DOWN"); // 프론트에서 "차단봉:" 옆에 뿌릴 용도
+        return result;
+    }
+
+    /**
+     * LLM으로 이미지에서 번호판만 추출
+     */
+    private String recognizePlate(String contentType, byte[] bytes) {
         Media media = Media.builder()
                 .mimeType(MimeType.valueOf(contentType))
                 .data(new ByteArrayResource(bytes))
@@ -35,54 +68,32 @@ public class CarwashEntryService {
 
         UserMessage userMessage = UserMessage.builder()
                 .text("""
-                이미지에서 차량 번호판을 읽어라.
-                번호판 형태는 '숫자2~3자리 + 한글1글자 + 숫자4자리' 예) '12가3456'.
-                
-                1) 추출한 번호판을 checkPlateRegistration 도구로 확인해라.
-                2) 등록된 차량이면 gateOpen 도구를 호출하라.
-                3) 등록되지 않은 차량이면 gateClose 도구를 호출하라.
-                
-                마지막 답변은 JSON만 반환:
-                {"plate":"12가3456","registered":true}
+                    이미지에서 자동차 번호판을 인식하세요.
+                    한국 번호판 형식(예: '12가3456', '157고4895')만 추출하고,
+                    다른 설명 없이 그 번호판만 텍스트로 반환하세요.
                 """)
                 .media(media)
                 .build();
 
         ChatClient chatClient = ChatClient.builder(chatModel).build();
-        String llmResp = chatClient
+
+        String raw = chatClient
                 .prompt()
                 .messages(userMessage)
-                .tools(vehicleCheckTools, carwashTools)
                 .call()
-                .content();
-
-        log.info("[ENTRY] llmResponse raw={}", llmResp);
-
-        String cleaned = llmResp.replace("```json","")
-                .replace("```","")
+                .content()
                 .trim();
 
-        JsonNode node = objectMapper.readTree(cleaned);
-        String plate = node.path("plate").asText("").replaceAll("\\s+","");
-        boolean registered = node.path("registered").asBoolean(false);
-
-        // 이 시점에서 vehicle 테이블에 plate가 없다면 insert 되고,
-        // 있으면 그대로 사용. existedBefore=true/false 알려줌
-        boolean existedBefore = carwashPlanService.ensureVehicleProfileEmbedding(plate);
-
-        EntryResult r = new EntryResult();
-        r.setPlate(plate);
-        // knownCustomer는 기존에 있던 row가 있었는지로 판단 (또는 LLM의 registered도 참고)
-        r.setKnownCustomer(existedBefore || registered);
-        r.setGate(registered ? "OPENED" : "CLOSED");
-
-        return r;
+        // 혹시 공백 섞여있으면 제거
+        String plate = raw.replaceAll("\\s+", "");
+        log.info("[ENTRY] 인식된 번호판 plate={}", plate);
+        return plate;
     }
 
     @lombok.Data
     public static class EntryResult {
-        private String plate;
-        private boolean knownCustomer;
-        private String gate;
+        private String plate;    // 인식된 번호판
+        private boolean known;   // 기존고객 여부 (vehicle에 있으면 true)
+        private String barrier;  // 'UP' or 'DOWN'
     }
 }

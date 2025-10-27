@@ -97,7 +97,8 @@ public class TrialService {
         // 사건별 맞춤형 개정 선언 메시지
         String openingMessage = buildOpeningMessage(trialCase);
 
-        return Flux.just(openingMessage);
+        // ✅ 수정: [DONE] 신호 추가
+        return Flux.just(openingMessage, "[DONE]");
     }
 
     /**

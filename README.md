@@ -40,7 +40,7 @@
 - **AI 응답 & 참조 설문 표시**: 생성된 상담 답변을 카드에 렌더링하고, 참조된 설문 목록에서 점수·요약·권장 행동·자가 소감을 포함한 세부 정보를 제공 // 위치: aipilot/src/main/webapp/views/ai1/counsel.jsp
 - **최근 설문 히스토리**: 상담 화면에서도 사용자 ID와 유형에 따라 `/ai1/api/surveys` 데이터를 불러와 테이블로 보여주고, 저장된 기록이 없을 때 안내 메시지를 제공 위치: aipilot/src/main/webapp/views/ai1/counsel.jsp
 
-## 2. Haunted Manual 괴담 근무 모듈
+## 2. Haunted Manual 매뉴얼 괴담
 이 기능은 관리자/근무자가 상황 별 괴담 규칙(매뉴얼) 문서를 업로드하고, AI와의 대화를 통해 매뉴얼에 대한 정보를 제공함.
 
 ### 주요 화면 (Left)

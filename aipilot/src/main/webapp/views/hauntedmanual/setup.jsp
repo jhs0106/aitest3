@@ -5,7 +5,6 @@
   const hauntedSetup = {
     currentScenario: '',
     init: function () {
-      this.loadScenarioOptions();
       this.loadSupportedTypes();
       $('#scenarioApplyBtn').on('click', () => this.applyScenario());
       $('#scenarioName').on('keypress', (event) => {
@@ -16,22 +15,6 @@
       });
       $('#uploadBtn').on('click', () => this.uploadManual());
       $('#clearBtn').on('click', () => this.clearVectorStore());
-    },
-    loadScenarioOptions: async function () {
-      try {
-        const response = await fetch('/api/haunted/manual/scenarios');
-        if (!response.ok) {
-          return;
-        }
-        const scenarios = await response.json();
-        const datalist = $('#scenarioOptions');
-        datalist.empty();
-        scenarios.forEach(name => {
-          datalist.append(`<option value="${name}"></option>`);
-        });
-      } catch (error) {
-        console.error('loadScenarioOptions error', error);
-      }
     },
     loadSupportedTypes: async function () {
       try {
@@ -75,7 +58,6 @@
         });
         const message = await response.text();
         this.appendLog(message);
-        await this.loadScenarioOptions();
       } catch (error) {
         console.error('uploadManual error', error);
         this.appendLog('문서를 업로드하지 못했습니다. 다시 시도하세요.');
@@ -122,7 +104,7 @@
       <div class="form-row align-items-center">
         <div class="col-sm-6 my-1">
           <label class="sr-only" for="scenarioName">시나리오 이름</label>
-          <input type="text" class="form-control" id="scenarioName" list="scenarioOptions"
+          <input type="text" class="form-control" id="scenarioName"
                  placeholder="예) 폐병원 야간 경비"/>
         </div>
         <div class="col-sm-3 my-1">
@@ -132,11 +114,9 @@
           <span class="badge badge-dark p-2" id="scenarioBadge">미지정</span>
         </div>
       </div>
-      <small class="form-text text-muted">이미 업로드된 시나리오를 선택하거나 새로운 이름을 입력할 수 있습니다.</small>
+      <small class="form-text text-muted">다른 모듈과 동일하게 시나리오 이름은 직접 입력해 관리합니다.</small>
     </div>
   </div>
-
-  <datalist id="scenarioOptions"></datalist>
 
   <div class="card mb-4 shadow-sm">
     <div class="card-header bg-secondary text-white">문서 업로드</div>

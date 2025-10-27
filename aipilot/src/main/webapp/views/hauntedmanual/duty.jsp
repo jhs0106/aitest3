@@ -6,33 +6,32 @@
     conversationId: '',
     currentScenario: '',
     init: function () {
-      this.loadScenarios();
-      $('#refreshScenariosBtn').on('click', () => this.loadScenarios());
+      $('#startScenarioBtn').on('click', () => this.beginDuty());
+      $('#scenarioInput').on('keypress', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          this.beginDuty();
+        }
+      });
       $('#sendQuestionBtn').on('click', () => this.handleQuestion());
       $('#resetSessionBtn').on('click', () => this.resetSession());
     },
-    loadScenarios: async function () {
-      try {
-        const response = await fetch('/api/haunted/manual/scenarios');
-        const scenarios = response.ok ? await response.json() : [];
-        const select = $('#scenarioSelect');
-        select.empty();
-        select.append('<option value="">시나리오 선택</option>');
-        scenarios.forEach(name => {
-          const escaped = $('<div>').text(name).html();
-          select.append(`<option value="${escaped}">${escaped}</option>`);
-        });
-      } catch (error) {
-        console.error('loadScenarios error', error);
+    beginDuty: async function () {
+      const scenario = $('#scenarioInput').val().trim();
+      const rumor = $('#dutyRumor').val().trim();
+      if (!scenario) {
+        alert('먼저 시나리오 이름을 입력하세요.');
+        return;
       }
+      await this.startScenario(scenario, rumor);
     },
     handleQuestion: async function () {
-      const scenario = $('#scenarioSelect').val().trim();
+      const scenario = $('#scenarioInput').val().trim();
       const rumor = $('#dutyRumor').val().trim();
       const question = $('#dutyQuestion').val().trim();
 
       if (!scenario) {
-        alert('먼저 시나리오를 선택하세요.');
+        alert('먼저 시나리오 이름을 입력하세요.');
         return;
       }
 
@@ -107,7 +106,7 @@
       this.conversationId = '';
       this.currentScenario = '';
       this.resetStory();
-      this.appendStatus('근무 세션을 초기화했습니다. 시나리오를 다시 선택하세요.');
+      this.appendStatus('근무 세션을 초기화했습니다. 시나리오를 다시 입력하세요.');
     },
     resetStory: function () {
       $('#dutyLog').empty();
@@ -173,16 +172,16 @@
     <div class="card-body">
       <div class="form-row align-items-center">
         <div class="col-sm-5 my-1">
-          <select class="form-control" id="scenarioSelect"></select>
+          <input type="text" class="form-control" id="scenarioInput" placeholder="예) 폐병원 야간 경비"/>
         </div>
-        <div class="col-sm-6 my-1">
-          <input type="text" class="form-control" id="dutyRumor" placeholder="최신 소문"/>
+        <div class="col-sm-4 my-1">
+          <input type="text" class="form-control" id="dutyRumor" placeholder="최신 소문 (선택)"/>
         </div>
-        <div class="col-sm-1 my-1 text-right">
-          <button class="btn btn-outline-dark btn-block" type="button" id="refreshScenariosBtn">새로고침</button>
+        <div class="col-sm-3 my-1 text-right">
+          <button class="btn btn-outline-dark btn-block" type="button" id="startScenarioBtn">근무 시작</button>
         </div>
       </div>
-      <small class="form-text text-muted">시나리오는 업로드 페이지에서 문서를 등록하면 목록에 나타납니다.</small>
+      <small class="form-text text-muted">시나리오 이름은 직접 입력하면 되며, 근무 시작 시 해당 이름으로 매뉴얼이 갱신됩니다.</small>
     </div>
   </div>
 

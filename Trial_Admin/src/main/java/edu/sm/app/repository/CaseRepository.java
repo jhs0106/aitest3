@@ -2,6 +2,7 @@ package edu.sm.app.repository;
 
 import edu.sm.app.dto.Case;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -21,7 +22,7 @@ public interface CaseRepository {
     /**
      * ID로 사건 조회
      */
-    Case select(int caseId) throws Exception;
+    Case select(@Param("caseId") int caseId) throws Exception;
 
     /**
      * 사건 등록
@@ -36,20 +37,20 @@ public interface CaseRepository {
     /**
      * 사건 삭제
      */
-    void delete(int caseId) throws Exception;
+    void delete(@Param("caseId") int caseId) throws Exception;
 
     /**
      * 상태별 조회
      */
-    List<Case> selectByStatus(String status) throws Exception;
+    List<Case> selectByStatus(@Param("status") String status) throws Exception;
 
     /**
      * 피고인별 조회
      */
-    List<Case> selectByDefendant(String defendant) throws Exception;
+    List<Case> selectByDefendant(@Param("defendant") String defendant) throws Exception;
 
     /**
      * 사건번호로 조회
      */
-    Case selectByCaseNumber(String caseNumber) throws Exception;
+    Case selectByCaseNumber(@Param("caseNumber") String caseNumber) throws Exception;
 }

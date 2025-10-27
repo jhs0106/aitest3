@@ -266,6 +266,9 @@
         border: 1px solid rgba(31, 41, 55, 0.08);
         box-shadow: 0 18px 32px rgba(15, 23, 42, 0.1);
         transition: transform 0.18s ease, box-shadow 0.18s ease;
+        word-wrap: break-word;      /* ← 추가 */
+        overflow-wrap: break-word;  /* ← 추가 */
+        box-sizing: border-box;     /* ← 추가: 패딩 포함 너비 계산 */
     }
 
     .message.human .message-content {
@@ -315,6 +318,8 @@
         color: var(--color-ink);
         white-space: pre-wrap;
         word-break: keep-all;
+        overflow-wrap: break-word;
+        max-width: 100%;
     }
 
     .message.human .message-text {
@@ -609,7 +614,7 @@
             }
 
             this.bindInputInteractions();
-            this.disableRoleSelection();
+            this.enableRoleSelection(); // this.disableRoleSelection();
             this.updateSendButtonState();
             this.updateRoleChip();
 
@@ -874,9 +879,6 @@
                     .then(res => res.json())
                     .then(data => {
                         if (data.success) {
-                            // 역할 전환 알림 메시지 추가
-                            this.addSystemMessage(data.message);
-
                             // UI 업데이트
                             this.updateRoleCards(roleId);
                             this.updateRoleChip();
@@ -964,7 +966,7 @@
             const decoratedMessage = role && role.promptPrefix ?
                     role.promptPrefix + ' ' + message : message;
 
-            this.addUserMessage(decoratedMessage);
+            this.addUserMessage(decoratedMessage, role);
 
             input.value = '';
             this.sending = true;

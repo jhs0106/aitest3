@@ -44,24 +44,30 @@
       });
 
       const data = await response.json();
-      // data = { plate:"12가3456", knownCustomer:true/false, gate:"OPENED" }
+      // 실제 data 형태:
+      // {
+      //   plate: "368러2704",
+      //   known: true/false,
+      //   barrier: "UP" or "DOWN"
+      // }
 
       this.plate = data.plate || null;
 
-      // 카드 UI 업데이트
       const cardHtml = `
         <div class="media border p-3">
           <div class="media-body">
             <h6>입차 처리 결과</h6>
             <p>번호판: <b>${data.plate || ''}</b></p>
-            <p>기존고객: <b>${data.knownCustomer ? '예' : '아니오'}</b></p>
-            <p>차단봉: <b>${data.gate || ''}</b></p>
+            <p>기존고객: <b>${data.known ? '예' : '아니오'}</b></p>
+            <p>차단봉: <b>${data.barrier == 'UP' ? '열림' :
+                              data.barrier == 'DOWN' ? '닫힘' :
+                              (data.barrier || '')}</b></p>
           </div>
           <img src="/image/assistant.png" class="ml-3 mt-3 rounded-circle" style="width:60px;">
         </div>`;
+
       document.getElementById('cw_entry_result').innerHTML = cardHtml;
 
-      // 다음 단계 버튼 활성화
       if (this.plate) {
         document.getElementById('cw_entry_next').disabled = false;
         document.getElementById('cw_entry_next').style.visibility = 'visible';
@@ -82,6 +88,7 @@
 
   document.addEventListener('DOMContentLoaded', ()=> cw_entry.init());
 </script>
+
 
 <div class="col-sm-10">
   <h2>세차장 — 입차 & 차단봉</h2>

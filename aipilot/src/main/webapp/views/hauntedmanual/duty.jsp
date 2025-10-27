@@ -31,7 +31,7 @@
       const question = $('#dutyQuestion').val().trim();
 
       if (!scenario) {
-        alert('먼저 시나리오 이름을 입력하세요.');
+        alert('먼저 상황에 대한 매뉴얼 이름을 입력하세요.');
         return;
       }
 
@@ -62,7 +62,7 @@
           body: params.toString()
         });
         if (!response.ok) {
-          throw new Error('시나리오 시작에 실패했습니다.');
+          throw new Error('상황에 따른 매뉴얼 시작에 실패했습니다.');
         }
         const data = await response.json();
         this.conversationId = data.conversationId;
@@ -106,7 +106,7 @@
       this.conversationId = '';
       this.currentScenario = '';
       this.resetStory();
-      this.appendStatus('근무 세션을 초기화했습니다. 시나리오를 다시 입력하세요.');
+      this.appendStatus('근무 세션을 초기화했습니다. 근무 상황을 다시 입력하세요.');
     },
     resetStory: function () {
       $('#dutyLog').empty();
@@ -178,10 +178,10 @@
 
 <div class="col-sm-10">
   <h2 class="mb-3">매뉴얼 괴담 속 근무 진행</h2>
-  <p class="text-muted">시나리오를 선택하면 첫 응답으로 근무 매뉴얼이 도착하고, 이후 질문은 매뉴얼을 기반으로 이어집니다.</p>
+  <p class="text-muted">근무에 따른 상황(매뉴얼)을 선택하면 첫 응답으로 근무 매뉴얼이 도착하고, 이후 질문은 매뉴얼을 기반으로 이어집니다.</p>
 
   <div class="card mb-4 border-info">
-    <div class="card-header bg-info text-dark">근무 매뉴얼 선택</div>
+    <div class="card-header bg-info text-dark">어떤 근무 매뉴얼인지 선택</div>
     <div class="card-body">
       <div class="form-row align-items-center">
         <div class="col-sm-5 my-1">

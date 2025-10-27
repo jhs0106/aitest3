@@ -58,7 +58,7 @@ public class CaseController {
     public String detail(@RequestParam("id") Integer caseId, Model model) {
         try {
             Case trialCase = caseService.getCaseById(caseId);
-            model.addAttribute("case", trialCase);
+            model.addAttribute("trialCase", trialCase);
         } catch (Exception e) {
             log.error("사건 조회 실패 - ID: {}", caseId, e);
             model.addAttribute("errorMessage", "사건 정보를 불러오는 중 오류가 발생했습니다.");

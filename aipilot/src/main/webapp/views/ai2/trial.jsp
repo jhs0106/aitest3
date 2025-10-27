@@ -266,6 +266,9 @@
         border: 1px solid rgba(31, 41, 55, 0.08);
         box-shadow: 0 18px 32px rgba(15, 23, 42, 0.1);
         transition: transform 0.18s ease, box-shadow 0.18s ease;
+        word-wrap: break-word;      /* ← 추가 */
+        overflow-wrap: break-word;  /* ← 추가 */
+        box-sizing: border-box;     /* ← 추가: 패딩 포함 너비 계산 */
     }
 
     .message.human .message-content {
@@ -315,6 +318,8 @@
         color: var(--color-ink);
         white-space: pre-wrap;
         word-break: keep-all;
+        overflow-wrap: break-word;
+        max-width: 100%;
     }
 
     .message.human .message-text {
@@ -540,6 +545,8 @@
 </style>
 
 <script>
+    const API_BASE_URL = '<c:url value="/ai2/api"/>';
+
     let trial = {
         sending: false,
         sessionId: null,
@@ -607,7 +614,7 @@
             }
 
             this.bindInputInteractions();
-            this.disableRoleSelection();
+            this.enableRoleSelection(); // this.disableRoleSelection();
             this.updateSendButtonState();
             this.updateRoleChip();
 
@@ -617,7 +624,7 @@
 
         // ⭐ 신규: 세션 정보 로드
         loadSessionInfo: function() {
-            fetch('/ai2/api/trial-session-info')
+            fetch(API_BASE_URL + '/trial-session-info')
                     .then(res => res.json())
                     .then(data => {
                         if (data.hasCase) {
@@ -660,7 +667,7 @@
 
         // ⭐ 신규: 사건 선택 모달 표시
         showCaseSelectionModal: function() {
-            fetch('/ai2/api/trial-cases')
+            fetch(API_BASE_URL + '/trial-cases')
                     .then(res => res.json())
                     .then(cases => {
                         if (cases.length === 0) {
@@ -690,46 +697,44 @@
             modal.style.backgroundColor = 'rgba(0,0,0,0.5)';
 
             let caseListHtml = cases.map(c => {
-                const typeLabel = c.caseType === 'criminal' ?
-                        '<span class="badge badge-danger">형사</span>' :
-                        '<span class="badge badge-primary">민사</span>';
+                const typeLabel = c.caseType === 'criminal'
+                        ? '<span class="badge badge-danger">형사</span>'
+                        : '<span class="badge badge-primary">민사</span>';
 
-                return `
-                <div class="case-item" onclick="trial.selectCase(${c.caseId})"
-                     style="padding: 15px; border: 1px solid #ddd; margin-bottom: 10px; cursor: pointer; border-radius: 5px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <strong>${c.caseNumber}</strong> ${typeLabel}
-                            <br><small>피고인: ${c.defendant} | 혐의: ${c.charge}</small>
-                        </div>
-                        <button class="btn btn-sm btn-success">
-                            <i class="fas fa-play"></i> 시작
-                        </button>
-                    </div>
-                </div>
-            `;
+                return '' +
+                        '<div class="case-item" onclick="trial.selectCase(' + c.caseId + ')" ' +
+                        '     style="padding: 15px; border: 1px solid #ddd; margin-bottom: 10px; cursor: pointer; border-radius: 5px;">' +
+                        '    <div style="display: flex; justify-content: space-between; align-items: center;">' +
+                        '        <div>' +
+                        '            <strong>' + c.caseNumber + '</strong> ' + typeLabel +
+                        '            <br><small>피고인: ' + c.defendant + ' | 혐의: ' + c.charge + '</small>' +
+                        '        </div>' +
+                        '        <button class="btn btn-sm btn-success">' +
+                        '            <i class="fas fa-play"></i> 시작' +
+                        '        </button>' +
+                        '    </div>' +
+                        '</div>';
             }).join('');
 
-            modal.innerHTML = `
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title"><i class="fas fa-gavel"></i> 재판할 사건 선택</h5>
-                        <button type="button" class="close" onclick="trial.closeCaseSelectionModal()">
-                            <span>&times;</span>
-                        </button>
-                    </div>
-                    <div class="modal-body" style="max-height: 500px; overflow-y: auto;">
-                        ${caseListHtml}
-                    </div>
-                    <div class="modal-footer">
-                        <button class="btn btn-secondary" onclick="trial.closeCaseSelectionModal()">
-                            취소
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
+            modal.innerHTML = '' +
+                    '<div class="modal-dialog modal-lg">' +
+                    '    <div class="modal-content">' +
+                    '        <div class="modal-header">' +
+                    '            <h5 class="modal-title"><i class="fas fa-gavel"></i> 재판할 사건 선택</h5>' +
+                    '            <button type="button" class="close" onclick="trial.closeCaseSelectionModal()">' +
+                    '                <span>&times;</span>' +
+                    '            </button>' +
+                    '        </div>' +
+                    '        <div class="modal-body" style="max-height: 500px; overflow-y: auto;">' +
+                    '            ' + caseListHtml +
+                    '        </div>' +
+                    '        <div class="modal-footer">' +
+                    '            <button class="btn btn-secondary" onclick="trial.closeCaseSelectionModal()">' +
+                    '                취소' +
+                    '            </button>' +
+                    '        </div>' +
+                    '    </div>' +
+                    '</div>';
 
             document.body.appendChild(modal);
         },
@@ -746,7 +751,7 @@
             const loadingId = this.addLoadingMessage();
 
             // 재판 시작 요청
-            const url = '/ai2/api/trial-start?caseId=' + caseId;
+            const url = API_BASE_URL + '/trial-start?caseId=' + encodeURIComponent(caseId);
             const eventSource = new EventSource(url);
             let openingMessage = '';
 
@@ -866,7 +871,7 @@
             this.currentRoleId = roleId;
 
             // 서버에 역할 전환 알림
-            fetch('/ai2/api/trial-switch-role', {
+            fetch(API_BASE_URL + '/trial-switch-role', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: 'role=' + roleId
@@ -874,9 +879,6 @@
                     .then(res => res.json())
                     .then(data => {
                         if (data.success) {
-                            // 역할 전환 알림 메시지 추가
-                            this.addSystemMessage(data.message);
-
                             // UI 업데이트
                             this.updateRoleCards(roleId);
                             this.updateRoleChip();
@@ -964,7 +966,7 @@
             const decoratedMessage = role && role.promptPrefix ?
                     role.promptPrefix + ' ' + message : message;
 
-            this.addUserMessage(decoratedMessage);
+            this.addUserMessage(decoratedMessage, role);
 
             input.value = '';
             this.sending = true;
@@ -1037,7 +1039,7 @@
         },
 
         fetchAIResponse: function(message, loadingId) {
-            const url = '/ai2/api/trial-chat?message=' + encodeURIComponent(message);
+            const url = API_BASE_URL + '/trial-chat?message=' + encodeURIComponent(message);
             const eventSource = new EventSource(url);
             let aiResponse = '';
             let aiMessageId = null;
@@ -1120,7 +1122,7 @@
             this.updateSendButtonState();
 
             const loadingId = this.addLoadingMessage();
-            const url = '/ai2/api/trial-ai-proceed?sessionId=' + encodeURIComponent(this.sessionId);
+            const url = API_BASE_URL + '/trial-ai-proceed?sessionId=' + encodeURIComponent(this.sessionId);
 
             const eventSource = new EventSource(url);
             let aiResponse = '';
@@ -1161,7 +1163,7 @@
             this.updateSendButtonState();
 
             const loadingId = this.addLoadingMessage();
-            const url = '/ai2/api/trial-verdict?sessionId=' + encodeURIComponent(this.sessionId);
+            const url = API_BASE_URL + '/trial-verdict?sessionId=' + encodeURIComponent(this.sessionId);
 
             const eventSource = new EventSource(url);
             let verdictText = '';
@@ -1207,7 +1209,7 @@
                 return;
             }
 
-            fetch('/ai2/api/trial-complete', { method: 'POST' })
+            fetch(API_BASE_URL + '/trial-complete', { method: 'POST' })
                     .then(res => res.json())
                     .then(data => {
                         if (data.success) {

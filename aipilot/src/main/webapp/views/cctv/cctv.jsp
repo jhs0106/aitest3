@@ -7,8 +7,9 @@
         // 주기적 분석을 위한 인터벌 변수
         analysisInterval: null,
         // AI에 보낼 고정 질문: 재난 상황을 감지하도록 유도하는 프롬프트
-        ANALYSIS_QUESTION: "현재 CCTV 영상의 상황을 분석해주세요. 특히, 화재, 심각한 사고, 응급상황과 같은 재난 상황이 감지되면 반드시 112 신고 도구(call112)를 사용하세요. 재난 상황이 아닐 경우, 간단히 현재 상황을 설명하세요.",
-        // 분석 주기 (20000ms = 20초)
+        ANALYSIS_QUESTION: "현재 CCTV 영상의 상황을 분석해주세요. 특히, 화재, 심각한 사고, 응급상황과 같은 재난 상황이 감지되면 반드시 119 신고 도구(call119)를 사용하세요. 재난 상황이 아닐 경우, 간단히 현재 상황을 설명하세요.",
+        // 분석
+        // 주기 (20000ms = 20초)
         ANALYSIS_INTERVAL_MS: 20000,
         // 분석 실행 상태
         isAnalysisRunning: false,
@@ -42,9 +43,9 @@
                 clearInterval(this.analysisInterval);
             }
 
-            this.updateButtonState(true); // 버튼 상태: 실행 중
-            this.displayMessage('CCTV 모니터링 시작. 20초마다 분석을 진행합니다.', 'text-success');
-
+            this.updateButtonState(true);
+            // 버튼 상태: 실행 중
+            this.displayMessage('CCTV 모니터링 시작. 20초마다 분석을 진행합니다. (재난 감지 시에만 알림)', 'text-success');
             // 최초 실행 (버튼 누르자마자 한 번 실행)
             this.captureFrame("video", (pngBlob) => {
                 if (pngBlob) this.send(pngBlob);
@@ -84,7 +85,6 @@
             const video = document.getElementById(videoId);
             //캔버스를 생성해서 비디오 크기와 동일하게 맞춤
             const canvas = document.createElement('canvas');
-
             // 비디오가 로드되지 않았을 경우 캡처하지 않음
             if (video.videoWidth === 0 || video.videoHeight === 0) {
                 handleFrame(null);
@@ -105,15 +105,13 @@
 
         send: async function(pngBlob){
             if (!this.isAnalysisRunning) return;
-
             // 분석 요청이 시작됨을 UI로 알림
             const tempUUID = 'temp-' + crypto.randomUUID();
             this.displayTempMessage("CCTV 영상 분석 및 재난 상황 감지 중...", tempUUID);
 
-            // 상태 메시지 업데이트
-            const nextTime = new Date(Date.now() + this.ANALYSIS_INTERVAL_MS).toLocaleTimeString('ko-KR');
-            $('#statusMessage').text(`마지막 분석 완료: ${new Date().toLocaleTimeString('ko-KR')} · 다음 분석: ${nextTime} 경`);
-
+            // 상태 메시지 업데이트 (다음 예상 분석 시간 표시)
+            const nextTime = new Date(Date.now() + this.ANALYSIS_INTERVAL_MS).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            $('#statusMessage').text(`마지막 분석 요청: ${new Date().toLocaleTimeString('ko-KR')} · 다음 분석: ${nextTime} 경`);
 
             // 멀티파트 폼 구성하기
             const formData = new FormData();
@@ -122,7 +120,7 @@
 
             // 이미지 분석 스트림 요청 및 결과 수집
             try {
-                // API 엔드포인트 변경: /cctv/api/analysis
+                // API 엔드포인트: /cctv/api/analysis
                 const analysisResponse = await fetch('/cctv/api/analysis', {
                     method: "post",
                     headers: {
@@ -131,25 +129,33 @@
                     body: formData
                 });
 
-                // 결과 표시를 위한 새로운 UI 생성
-                let uuid = this.makeAssistantUI();
                 // 임시 메시지 제거
                 $('#media-' + tempUUID).remove();
 
+                // 스트리밍 데이터 수집
                 const reader = analysisResponse.body.getReader();
                 const decoder = new TextDecoder("utf-8");
                 let content = "";
 
-                // 스트리밍된 내용을 수집 및 실시간 업데이트
+                // 스트리밍된 내용을 모두 수집
                 while (true) {
                     const {value, done} = await reader.read();
                     if (done) break;
                     let chunk = decoder.decode(value);
                     content += chunk;
-                    $('#' + uuid).html(content)
                 }
 
-                this.displayMessage('분석 결과 수신 완료.', 'text-success');
+                content = content.trim();
+
+                if (content === 'NO_DISASTER_DETECTED') {
+                    // 재난 상황 아님: 아무것도 출력하지 않고 상태 메시지만 업데이트
+                    this.displayMessage(`분석 완료 (재난 없음): 다음 분석(${nextTime} 경) 대기 중.`, 'text-muted');
+                } else {
+                    // 재난 상황 감지됨: 결과를 화면에 출력 (강조된 UI 사용)
+                    let uuid = this.makeAssistantUI();
+                    $('#' + uuid).html(content);
+                    this.displayMessage('🚨 재난 상황 감지 및 신고 조치 완료! (119 신고 시뮬레이션)', 'text-danger');
+                }
 
             } catch (error) {
                 console.error('CCTV 분석 요청 실패:', error);
@@ -175,14 +181,14 @@
         makeAssistantUI: function() {
             let uuid = "id-" + crypto.randomUUID();
             let aForm = `
-                  <div class="media border p-3">
+                  <div class="media border p-3 border-danger bg-light">
                     <div class="media-body">
-                      <h6>AI 감시 요원 분석 결과 (${new Date().toLocaleTimeString('ko-KR')})</h6>
+                      <h6>🚨 AI 감시 요원 - **재난 상황 감지!** (${new Date().toLocaleTimeString('ko-KR')})</h6>
                       <p><pre id="`+uuid+`"></pre></p>
                     </div>
                     <img src="<c:url value="/image/assistant.png"/>" alt="Assistant" class="ml-3 mt-3 rounded-circle" style="width:60px;">
                   </div>
-            `;
+            `; // 재난 상황 강조를 위해 border-danger 추가 및 메시지 수정
             $('#result').prepend(aForm);
             return uuid;
         },
@@ -217,7 +223,7 @@
             </div>
 
             <div id="result" class="container p-3 my-3 border" style="overflow: auto;width:auto;height: 500px;">
-                <p class="text-info">재난 상황 발생 시, AI가 112에 신고하는 도구를 사용합니다.</p>
+                <p class="text-info">시스템이 20초마다 CCTV 영상을 분석합니다. **재난 상황**이 감지될 경우에만 AI가 119 신고 도구를 사용하고 결과를 출력합니다.</p>
             </div>
         </div>
 
@@ -225,7 +231,8 @@
             <div class="card shadow-sm">
                 <div class="card-body">
                     <h5 class="card-title">실시간 CCTV (카메라 미리보기)</h5>
-                    <video id="video" style="width: 100%; border: 1px solid #ccc;" autoplay muted playsinline></video>
+                    <video id="video" style="width: 100%;
+                    border: 1px solid #ccc;" autoplay muted playsinline></video>
                 </div>
             </div>
         </div>

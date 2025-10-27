@@ -11,6 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Flux;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -124,5 +125,66 @@ public class Ai2RestController {
         log.info("통합 재판 - 세션ID: {}, 법률유형: {}, 메시지: {}",
                 session.getId(), lawType, message);
         return trialService.chatWithMemoryAndRag(message, session.getId(), lawType);
+    }
+
+    /**
+     * AI 자동 진행 - 검사/변호사 자동 발언
+     */
+    @GetMapping(value = "/trial-ai-proceed", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> trialAiProceed(
+            @RequestParam(value = "sessionId", required = false) String sessionId,
+            HttpSession session) {
+        String sid = sessionId != null ? sessionId : session.getId();
+        log.info("AI 자동 진행 - 세션ID: {}", sid);
+        return trialService.aiAutoProceed(sid);
+    }
+
+    /**
+     * 판결 생성 - Memory + RAG 기반
+     */
+    @GetMapping(value = "/trial-verdict", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> trialVerdict(
+            @RequestParam(value = "sessionId", required = false) String sessionId,
+            HttpSession session) {
+        String sid = sessionId != null ? sessionId : session.getId();
+        log.info("판결 생성 - 세션ID: {}", sid);
+        return trialService.generateVerdict(sid);
+    }
+
+    /**
+     * 재판 종료
+     */
+    @PostMapping("/trial-complete")
+    public Map<String, Object> trialComplete(
+            @RequestParam(value = "sessionId", required = false) String sessionId,
+            HttpSession session) {
+        String sid = sessionId != null ? sessionId : session.getId();
+        log.info("재판 종료 - 세션ID: {}", sid);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "재판이 종료되었습니다.");
+        response.put("sessionId", sid);
+
+        return response;
+    }
+
+    /**
+     * 역할 전환
+     */
+    @PostMapping("/trial-switch-role")
+    public Map<String, Object> trialSwitchRole(
+            @RequestParam("role") String role,
+            @RequestParam(value = "sessionId", required = false) String sessionId,
+            HttpSession session) {
+        String sid = sessionId != null ? sessionId : session.getId();
+        log.info("역할 전환 - 세션ID: {}, 새 역할: {}", sid, role);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("newRole", role);
+        response.put("message", "역할이 " + role + "로 전환되었습니다.");
+
+        return response;
     }
 }

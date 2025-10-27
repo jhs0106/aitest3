@@ -320,4 +320,101 @@ public class TrialService {
 
     private record RoleInstruction(String roleName, String roleSummary, String aiGuide, String salutation) {
     }
+
+    /**
+     * AI 자동 진행 - 검사/변호사가 자동으로 발언
+     */
+    public Flux<String> aiAutoProceed(String conversationId) {
+        log.info("AI 자동 진행 - 대화ID: {}", conversationId);
+
+        ChatClient chatClient = chatClientBuilder
+                .defaultAdvisors(
+                        PromptChatMemoryAdvisor.builder(chatMemory).build(),
+                        new SimpleLoggerAdvisor(Ordered.LOWEST_PRECEDENCE - 1)
+                )
+                .defaultTools(trialRoleTools)  // ⭐ 수정: 객체 자체 전달
+                .build();
+
+        return chatClient.prompt()
+                .system("""
+                당신은 대한민국 법정의 AI 재판부입니다.
+                
+                현재 재판이 진행 중입니다. 이전 대화 내용을 바탕으로:
+                
+                1. 검사의 입장에서 기소 의견을 제시하세요.
+                   - prosecutorProsecute() 함수를 호출하여 구형하세요.
+                   
+                2. 변호사의 입장에서 변론을 제시하세요.
+                   - attorneyDefend() 함수를 호출하여 정상참작 사유를 말하세요.
+                
+                자연스럽게 검사와 변호사의 의견을 모두 제시하되,
+                함수 호출 결과를 바탕으로 답변하세요.
+                
+                말투:
+                - "~합니다" 형식의 존댓말 사용
+                - 법정 용어 사용
+                - 공정하고 객관적으로
+                """)
+                .user("현재까지의 재판 진행 상황을 검토하고, 검사와 변호사의 의견을 제시해주세요.")
+                .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, conversationId))
+                .stream()
+                .content();
+    }
+
+    /**
+     * 판결 생성 - Memory + RAG 통합
+     */
+    public Flux<String> generateVerdict(String conversationId) {
+        log.info("판결 생성 - 대화ID: {}", conversationId);
+
+        SearchRequest searchRequest = SearchRequest.builder()
+                .similarityThreshold(0.0)
+                .topK(5)
+                .filterExpression("type == 'criminal_law' or type == 'civil_law'")
+                .build();
+
+        QuestionAnswerAdvisor ragAdvisor = QuestionAnswerAdvisor.builder(vectorStore)
+                .searchRequest(searchRequest)
+                .build();
+
+        ChatClient chatClient = chatClientBuilder
+                .defaultAdvisors(
+                        PromptChatMemoryAdvisor.builder(chatMemory).build(),
+                        new SimpleLoggerAdvisor(Ordered.LOWEST_PRECEDENCE - 1)
+                )
+                .defaultTools(trialRoleTools)  // ⭐ 수정: 객체 자체 전달
+                .build();
+
+        return chatClient.prompt()
+                .system("""
+                당신은 대한민국 법정의 AI 판사입니다.
+                
+                이제 최종 판결을 선고해야 합니다.
+                
+                판결 작성 지침:
+                1. 이전 대화 내용(Memory)을 모두 검토하세요
+                2. 관련 법조문(RAG)을 참고하세요
+                3. judgeVerdict() 함수를 호출하여 판결을 선고하세요
+                
+                판결 구성:
+                - 사건 개요
+                - 적용 법조문
+                - 피고인의 진술 요약
+                - 검사의 구형 요약
+                - 변호사의 변론 요약
+                - 정상참작 사유
+                - 최종 판결 (형량)
+                - 판결 이유
+                
+                말투:
+                - 엄숙하고 공정하게
+                - "피고인을 ~에 처한다" 형식 사용
+                - 법적 근거를 명확히 제시
+                """)
+                .user("지금까지의 모든 진술과 증거를 종합하여 공정한 판결을 내려주세요.")
+                .advisors(ragAdvisor)
+                .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, conversationId))
+                .stream()
+                .content();
+    }
 }

@@ -23,7 +23,7 @@ public class CarwashExitService {
         barrierControlService.up();
 
         // 2. 출차 로그 기록
-        gateLogService.logExit(plate);
+        gateLogService.logGateClose(plate);
 
         // 필요하면 여기서 wash_order 상태 DONE 업데이트 등 추가 가능
 

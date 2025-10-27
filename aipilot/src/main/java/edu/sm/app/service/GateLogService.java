@@ -13,29 +13,33 @@ public class GateLogService {
     private final JdbcTemplate jdbc;
 
     private void insertLog(String plate, String eventType) {
-        log.info("[GATE-LOG] {} plate={}", eventType, plate);
+        // plate 정리 (공백 제거)
+        String norm = (plate != null) ? plate.replaceAll("\\s+", "") : null;
+
         jdbc.update("""
             INSERT INTO carwash_gate_log (plate, event_type)
             VALUES (?, ?)
-        """, plate, eventType);
+        """, norm, eventType);
+
+        log.info("[GATELOG] {} - {}", norm, eventType);
     }
 
-    /** 입차 기록 */
+    /** 입차 시점 기록 */
     public void logEntry(String plate) {
         insertLog(plate, "ENTRY");
     }
 
-    /** 출차 기록 (차가 나간 시점) */
+    /** 출차 시점 기록 */
     public void logExit(String plate) {
         insertLog(plate, "EXIT");
     }
 
-    /** 게이트 열림 기록 */
+    /** 차단봉/게이트 열림 기록 */
     public void logGateOpen(String plate) {
         insertLog(plate, "GATE_OPEN");
     }
 
-    /** 게이트 닫힘 기록 */
+    /** 차단봉/게이트 닫힘 기록 */
     public void logGateClose(String plate) {
         insertLog(plate, "GATE_CLOSE");
     }

@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 
+import java.util.Map;
+
 /**
  * 모의 법정 서비스 - Phase 2 완성본
  *
@@ -38,27 +40,73 @@ public class TrialService {
     @Autowired
     private VectorStore vectorStore;
 
+    private static final RoleInstruction DEFAULT_ROLE = new RoleInstruction(
+            "참가자",
+            "사용자는 특정 역할을 지정하지 않았습니다. 일반적인 재판 참여자로 간주합니다.",
+            "AI는 중립적인 진행자로서 요점을 정리하고 필요한 절차나 다음 행동을 안내하세요.",
+            "참가자님"
+    );
+
+    private static final Map<String, RoleInstruction> ROLE_INSTRUCTIONS = Map.ofEntries(
+            Map.entry("judge", new RoleInstruction(
+                    "판사",
+                    "사용자는 재판을 주도하며 절차를 관리하는 판사입니다.",
+                    "AI는 공동 재판부의 시각에서 절차적 유의점과 다음 진행 방향을 제안하고, 다른 참가자의 발언을 어떻게 이끌지 조언하세요.",
+                    "판사님"
+            )),
+            Map.entry("prosecutor", new RoleInstruction(
+                    "검사",
+                    "사용자는 피고인의 혐의를 입증하려는 검사입니다.",
+                    "AI는 재판장의 시각에서 증거 보완, 추가 입증이 필요한 부분, 예상되는 반박을 안내하고 공정한 절차를 강조하세요.",
+                    "검사님"
+            )),
+            Map.entry("defender", new RoleInstruction(
+                    "변호인",
+                    "사용자는 피고인을 대리해 반론을 제기하는 변호인입니다.",
+                    "AI는 판사의 관점에서 주장 구조화를 돕고, 추가로 확인해야 할 사실이나 법리를 제시하며, 균형 잡힌 시각을 유지하세요.",
+                    "변호인님"
+            )),
+            Map.entry("defendant", new RoleInstruction(
+                    "피고인",
+                    "사용자는 직접 진술하는 피고인입니다.",
+                    "AI는 판사로서 권리 고지, 진술 시 주의사항, 정황을 명확히 하기 위한 질문을 제시하며 차분히 안내하세요.",
+                    "피고인님"
+            )),
+            Map.entry("witness", new RoleInstruction(
+                    "증인",
+                    "사용자는 사실관계를 진술하는 증인입니다.",
+                    "AI는 재판부로서 증언의 핵심을 정리하고 추가 확인이 필요한 사실을 질문하며, 선서나 증언 태도에 대해 상기시키세요.",
+                    "증인님"
+            )),
+            Map.entry("jury", new RoleInstruction(
+                    "참심위원",
+                    "사용자는 배심 또는 시민참여 재판의 참심위원입니다.",
+                    "AI는 재판장 시각에서 고려해야 할 판단 요소를 안내하고, 토론을 위한 질문이나 정리 포인트를 제안하세요.",
+                    "참심위원님"
+            ))
+    );
+
     /**
      * 기본 AI 판사 채팅 (기존 메서드 유지)
      */
     public Flux<String> chat(String message) {
-        log.info("사용자 메시지: {}", message);
+        return chat(message, null);
+    }
+
+    /**
+     * 역할 맥락을 포함한 AI 판사 채팅
+     */
+    public Flux<String> chat(String message, String roleId) {
+        log.info("사용자 메시지: {}, 역할: {}", message, roleId);
 
         ChatClient chatClient = chatClientBuilder.build();
+        RoleInstruction roleInstruction = resolveRoleInstruction(roleId);
+        String systemPrompt = buildSystemPrompt(roleInstruction);
+        String userMessage = decorateUserMessage(message, roleInstruction);
 
         return chatClient.prompt()
-                .system("""
-                    당신은 대한민국 법정의 판사입니다.
-                    
-                    역할:
-                    - 정중하고 공정하게 대화합니다
-                    - 법률 용어를 쉽게 설명합니다
-                    - 재판 절차를 안내합니다
-                    
-                    말투:
-                    - "~합니다" 형식 사용
-                    - 존댓말 사용
-                    """)
+                .system(systemPrompt)
+                .user(userMessage)
                 .user(message)
                 .stream()
                 .content();
@@ -194,6 +242,45 @@ public class TrialService {
                 .content();
     }
 
+    private RoleInstruction resolveRoleInstruction(String roleId) {
+        if (!StringUtils.hasText(roleId)) {
+            return DEFAULT_ROLE;
+        }
+        return ROLE_INSTRUCTIONS.getOrDefault(roleId, DEFAULT_ROLE);
+    }
+
+    private String buildSystemPrompt(RoleInstruction roleInstruction) {
+        return String.format("""
+                당신은 대한민국 법정의 AI 재판부입니다.
+
+                기본 원칙:
+                - 정중하고 공정하게 대화합니다
+                - 법률 용어를 쉽게 설명합니다
+                - 재판 절차를 안내합니다
+                - "~합니다" 형식의 존댓말을 사용합니다
+
+                현재 발언자는 %s 역할입니다.
+                역할 설명:
+                %s
+
+                응답 지침:
+                %s
+
+                답변 시에는 "%s"이라는 호칭으로 부르고,
+                발언자의 목적을 존중하면서 필요한 후속 질문이나 다음 절차를 제안하세요.
+                """,
+                roleInstruction.roleName(),
+                roleInstruction.roleSummary(),
+                roleInstruction.aiGuide(),
+                roleInstruction.salutation()
+        );
+    }
+
+    private String decorateUserMessage(String message, RoleInstruction roleInstruction) {
+        String safeMessage = StringUtils.hasText(message) ? message : "";
+        return "[" + roleInstruction.roleName() + "] " + safeMessage;
+    }
+
     /**
      * ⭐ Phase 2 신규: Function Calling 통합 재판
      * AI가 상황에 따라 판사/검사/변호사 함수를 자동 호출
@@ -229,5 +316,8 @@ public class TrialService {
                 .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, conversationId))
                 .stream()
                 .content();
+    }
+
+    private record RoleInstruction(String roleName, String roleSummary, String aiGuide, String salutation) {
     }
 }

@@ -1,6 +1,31 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 
+<style>
+  .haunted-spinner-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1050;
+  }
+
+  .haunted-spinner-overlay.active {
+    display: flex;
+  }
+</style>
+
+<div class="haunted-spinner-overlay" id="hauntedSpinner" aria-hidden="true">
+  <div class="spinner-border text-light" role="status" aria-live="polite" aria-label="LLM 응답 대기 중">
+    <span class="sr-only">답변을 생성하고 있습니다...</span>
+  </div>
+</div>
+
 <script>
   const hauntedDuty = {
     conversationId: '',
@@ -56,6 +81,7 @@
       this.resetStory();
       const params = new URLSearchParams();
       params.append('scenario', scenario);
+      this.showSpinner();
       try {
         const response = await fetch('/api/haunted/manual/start', {
           method: 'post',
@@ -76,6 +102,8 @@
         console.error('startScenario error', error);
         this.appendStatus('근무 매뉴얼을 불러오지 못했습니다.');
         throw error;
+      } finally {
+        this.hideSpinner();
       }
     },
     sendQuestion: async function (question, scenario) {
@@ -83,6 +111,7 @@
       params.append('conversationId', this.conversationId);
       params.append('question', question);
       params.append('scenario', scenario);
+      this.showSpinner();
       try {
         const response = await fetch('/api/haunted/manual/ask', {
           method: 'post',
@@ -100,6 +129,8 @@
       } catch (error) {
         console.error('sendQuestion error', error);
         this.appendStatus('응답을 가져오지 못했습니다. 근무 상태를 다시 확인하세요.');
+      } finally {
+        this.hideSpinner();
       }
     },
     resetSession: function () {
@@ -117,7 +148,7 @@
               .replace(/&/g, '&amp;')
               .replace(/</g, '&lt;')
               .replace(/>/g, '&gt;')
-              .replace(/\"/g, '&quot;')
+              .replace(/\\"/g, '&quot;')
               .replace(/'/g, '&#39;');
     },
     appendUser: function (text) {
@@ -168,6 +199,12 @@
               + '</div>';
       container.append(template);
       container.scrollTop(container[0].scrollHeight);
+    },
+    showSpinner: function () {
+      $('#hauntedSpinner').addClass('active').attr('aria-hidden', 'false');
+    },
+    hideSpinner: function () {
+      $('#hauntedSpinner').removeClass('active').attr('aria-hidden', 'true');
     }
   };
 

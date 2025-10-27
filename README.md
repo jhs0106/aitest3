@@ -1,6 +1,6 @@
 ### 🧑‍💻TEAM 3 - springai4~5 기술 기반 기능 구현
 ***
-### 시연 영상 : [![Video Label](http://img.youtube.com/vi/zlSSEia3yD0/0.jpg)]
+### 시연 영상 : [![Video Label](http://img.youtube.com/vi/v=zlSSEia3yD0/0.jpg)]
 https://www.youtube.com/watch?v=zlSSEia3yD0
 ***
 # 🎯 주제

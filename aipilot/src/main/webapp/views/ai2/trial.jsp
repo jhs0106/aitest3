@@ -1398,10 +1398,8 @@
                     </div>
 
                     <!-- ⭐ 추가 버튼들 -->
+                    <!-- ⭐ 추가 버튼들 -->
                     <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="trial.aiAutoProceed()">
-                            🤖 AI 자동 진행
-                        </button>
                         <button type="button" class="btn btn-warning btn-sm" onclick="trial.generateVerdict()">
                             ⚖️ 판결 생성
                         </button>

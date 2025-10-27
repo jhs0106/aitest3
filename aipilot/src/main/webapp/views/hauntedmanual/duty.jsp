@@ -16,19 +16,25 @@
       $('#sendQuestionBtn').on('click', () => this.handleQuestion());
       $('#resetSessionBtn').on('click', () => this.resetSession());
     },
+    getTrimmedValue: function (selector) {
+      const element = $(selector);
+      if (!element.length) {
+        return '';
+      }
+      const value = element.val();
+      return (value == null ? '' : String(value)).trim();
+    },
     beginDuty: async function () {
-      const scenario = $('#scenarioInput').val().trim();
-      const rumor = $('#dutyRumor').val().trim();
+      const scenario = this.getTrimmedValue('#scenarioInput');
       if (!scenario) {
         alert('먼저 시나리오 이름을 입력하세요.');
         return;
       }
-      await this.startScenario(scenario, rumor);
+      await this.startScenario(scenario);
     },
     handleQuestion: async function () {
-      const scenario = $('#scenarioInput').val().trim();
-      const rumor = $('#dutyRumor').val().trim();
-      const question = $('#dutyQuestion').val().trim();
+      const scenario = this.getTrimmedValue('#scenarioInput');
+      const question = this.getTrimmedValue('#dutyQuestion');
 
       if (!scenario) {
         alert('먼저 상황에 대한 매뉴얼 이름을 입력하세요.');
@@ -36,7 +42,7 @@
       }
 
       if (!this.conversationId || scenario !== this.currentScenario) {
-        await this.startScenario(scenario, rumor);
+        await this.startScenario(scenario);
       }
 
       if (!question) {
@@ -44,15 +50,12 @@
       }
 
       this.appendUser(question);
-      await this.sendQuestion(question, scenario, rumor);
+      await this.sendQuestion(question, scenario);
     },
-    startScenario: async function (scenario, rumor) {
+    startScenario: async function (scenario) {
       this.resetStory();
       const params = new URLSearchParams();
       params.append('scenario', scenario);
-      if (rumor) {
-        params.append('rumor', rumor);
-      }
       try {
         const response = await fetch('/api/haunted/manual/start', {
           method: 'post',
@@ -75,14 +78,11 @@
         throw error;
       }
     },
-    sendQuestion: async function (question, scenario, rumor) {
+    sendQuestion: async function (question, scenario) {
       const params = new URLSearchParams();
       params.append('conversationId', this.conversationId);
       params.append('question', question);
       params.append('scenario', scenario);
-      if (rumor) {
-        params.append('rumor', rumor);
-      }
       try {
         const response = await fetch('/api/haunted/manual/ask', {
           method: 'post',
@@ -117,7 +117,7 @@
               .replace(/&/g, '&amp;')
               .replace(/</g, '&lt;')
               .replace(/>/g, '&gt;')
-              .replace(/"/g, '&quot;')
+              .replace(/\"/g, '&quot;')
               .replace(/'/g, '&#39;');
     },
     appendUser: function (text) {
@@ -184,7 +184,7 @@
     <div class="card-header bg-info text-dark">어떤 근무 매뉴얼인지 선택</div>
     <div class="card-body">
       <div class="form-row align-items-center">
-        <div class="col-sm-5 my-1">
+        <div class="col-sm-8 my-1">
           <input type="text" class="form-control" id="scenarioInput" placeholder="예) 병원"/>
         </div>
         <div class="col-sm-3 my-1 text-right">

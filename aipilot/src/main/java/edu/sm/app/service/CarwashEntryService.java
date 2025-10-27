@@ -28,12 +28,9 @@ public class CarwashEntryService {
         plate = (plate != null) ? plate.replaceAll("\\s+","") : null;
 
         if (plate == null || plate.isBlank()) {
-            // 인식 실패 시: 차단봉은 닫고, known=false 로 응답
+            // 인식 실패 -> 차단봉 닫음 유지
             log.warn("[ENTRY] plate 인식 실패. barrier CLOSE 유지.");
             barrierControlService.down();
-
-            // 로그: 최소한 시도한건 ENTRY로 남겨줄 수도 있고, 애매하면 안 남겨도 된다.
-            // 여기선 아예 plate 없이 남기는 건 의미 없으니 스킵
 
             EntryResult failRes = new EntryResult();
             failRes.setPlate("(UNKNOWN)");
@@ -42,33 +39,53 @@ public class CarwashEntryService {
             return failRes;
         }
 
-        // 2. 기존 고객 여부 확인
+        // 2. 기존 고객 여부
         boolean alreadyKnown = jdbcCarRegistry.isKnownCar(plate);
 
-        // 3. 신규라면 vehicle에 INSERT (ON CONFLICT DO NOTHING -> 기존이면 무시)
+        // 3. 신규면 INSERT / 기존이면 무시
         jdbcCarRegistry.upsertVehicleOnEntry(plate);
 
-        // 4. 차단봉 제어 정책
+        // 4. 정책: 기존 고객이면 자동 오픈, 신규면 닫아둠
         if (alreadyKnown) {
-            barrierControlService.up();     // 기존 고객이면 자동 오픈
+            barrierControlService.up();
         } else {
-            barrierControlService.down();   // 신규면 우선 닫아둔다 (정책에 따라 바꿀 수 있음)
+            barrierControlService.down();
         }
 
-        // 5. 게이트 로그 기록
+        // 5. 로그
         gateLogService.logEntry(plate);
         if (alreadyKnown) {
-            gateLogService.logGateOpen(plate);   // known 고객: 열린 상태
+            gateLogService.logGateOpen(plate);
         } else {
-            gateLogService.logGateClose(plate);  // unknown 고객: 닫힌 상태
+            gateLogService.logGateClose(plate);
         }
 
-        // 6. 결과 DTO 만들어서 반환
+        // 6. 결과 리턴
         EntryResult result = new EntryResult();
         result.setPlate(plate);
         result.setKnown(alreadyKnown);
         result.setBarrier(alreadyKnown ? "UP" : "DOWN");
         return result;
+    }
+
+    /**
+     * 입차 상황에서 사람이 "차단봉 올리기"를 눌렀을 때 호출.
+     * - barrier만 올린다.
+     * - GATE_OPEN 로그만 남긴다.
+     * - 절대 EXIT 로그는 찍지 않는다. (차량은 아직 안 나갔으니까)
+     */
+    public ManualOpenResult manualOpenForEntry(String plate) {
+        // 실제 차단봉 제어
+        barrierControlService.up();
+
+        // 게이트 오픈 기록만 남김
+        gateLogService.logGateOpen(plate);
+
+        ManualOpenResult res = new ManualOpenResult();
+        res.setPlate(plate);
+        res.setBarrier("UP");
+        res.setMessage("입차 차단봉 수동 개방 완료");
+        return res;
     }
 
     /** LLM 비전으로 번호판 문자열만 추출 */
@@ -97,6 +114,7 @@ public class CarwashEntryService {
 
         if (raw == null) return null;
         String plate = raw.trim().replaceAll("\\s+","");
+
         log.info("[ENTRY] 인식된 번호판 plate={}", plate);
         return plate;
     }
@@ -104,7 +122,14 @@ public class CarwashEntryService {
     @lombok.Data
     public static class EntryResult {
         private String plate;    // "157고4895"
-        private boolean known;   // DB에 이미 등록돼 있던 차인지 여부
-        private String barrier;  // "UP" 또는 "DOWN"
+        private boolean known;   // 이미 등록된 차량인지
+        private String barrier;  // "UP" / "DOWN"
+    }
+
+    @lombok.Data
+    public static class ManualOpenResult {
+        private String plate;    // "157고4895"
+        private String barrier;  // "UP" / "DOWN"
+        private String message;  // "입차 차단봉 수동 개방 완료"
     }
 }

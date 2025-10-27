@@ -7,6 +7,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 @Component
 @Slf4j
@@ -101,7 +102,11 @@ public class TrialRoleTools {
      */
     @Tool(description = "판사가 최종 판결을 선고합니다")
     public VerdictResponse judgeVerdict(VerdictRequest request) {  // ⭐ Function 제거
-        log.info("판결 선고 - 피고인: {}, 판결: {}", request.defendant(), request.verdict());
+        String defendant = StringUtils.hasText(request.defendant()) ? request.defendant() : "피고인";
+        String verdict = StringUtils.hasText(request.verdict()) ? request.verdict() : "선고유예";
+        String reason = StringUtils.hasText(request.reason()) ? request.reason() : "제출된 진술과 증거를 종합한 결과, 형의 선고가 적정하다고 판단하였습니다.";
+
+        log.info("판결 선고 - 피고인: {}, 판결: {}", defendant, verdict);
 
         String sentenceText = String.format("""
             ⚖️ 판결 선고
@@ -116,16 +121,16 @@ public class TrialRoleTools {
             
             이상으로 판결을 마칩니다.
             """,
-                request.defendant(),
-                request.verdict(),
-                request.reason()
+                defendant,
+                verdict,
+                reason
         );
 
         return new VerdictResponse(
                 "SUCCESS",
                 sentenceText,
-                request.verdict(),
-                request.reason()
+                verdict,
+                reason
         );
     }
 
@@ -200,15 +205,15 @@ public class TrialRoleTools {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @JsonClassDescription("판결 선고 요청")
     public record VerdictRequest(
-            @JsonProperty(required = true, value = "defendant")
+            @JsonProperty(value = "defendant")
             @JsonPropertyDescription("피고인 이름")
             String defendant,
 
-            @JsonProperty(required = true, value = "verdict")
+            @JsonProperty(value = "verdict")
             @JsonPropertyDescription("판결 내용 (예: 징역 3개월, 집행유예 1년)")
             String verdict,
 
-            @JsonProperty(required = true, value = "reason")
+            @JsonProperty(value = "reason")
             @JsonPropertyDescription("판결 이유")
             String reason
     ) {}

@@ -68,7 +68,7 @@
         this.conversationId = data.conversationId;
         this.currentScenario = data.scenario;
         this.appendStory('manual', data.manual);
-        this.appendStatus(`${data.scenario} 근무 매뉴얼이 전송되었습니다.`);
+        this.appendStatus(data.scenario + ' 근무 매뉴얼이 전송되었습니다.');
       } catch (error) {
         console.error('startScenario error', error);
         this.appendStatus('근무 매뉴얼을 불러오지 못했습니다.');
@@ -111,19 +111,29 @@
     resetStory: function () {
       $('#dutyLog').empty();
     },
+    escapeHtml: function (text) {
+      const value = text == null ? '' : String(text);
+      return value
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#39;');
+    },
     appendUser: function (text) {
       if (!text) {
         return;
       }
+      const safeText = this.escapeHtml(text);
       const container = $('#dutyLog');
-      const template = `
-                <div class="media border p-3 mb-2 bg-light text-dark">
-                    <img src="/image/user.png" alt="duty" class="mr-3 rounded-circle" style="width:40px; height:40px;">
-                    <div class="media-body">
-                        <small class="text-muted d-block">근무자</small>
-                        <p class="mb-0" style="white-space: pre-wrap;">${text}</p>
-                    </div>
-                </div>`;
+      const template = ''
+              + '<div class="media border p-3 mb-2 bg-light text-dark">\n'
+              + '    <img src="/image/user.png" alt="duty" class="mr-3 rounded-circle" style="width:40px; height:40px;">\n'
+              + '    <div class="media-body">\n'
+              + '        <small class="text-muted d-block">근무자</small>\n'
+              + '        <p class="mb-0" style="white-space: pre-wrap;">' + safeText + '</p>\n'
+              + '    </div>\n'
+              + '</div>';
       container.append(template);
       container.scrollTop(container[0].scrollHeight);
     },
@@ -131,16 +141,17 @@
       if (!text) {
         return;
       }
+      const safeText = this.escapeHtml(text);
       const container = $('#dutyLog');
       const heading = type === 'manual' ? '근무 매뉴얼' : '규칙 업데이트';
-      const template = `
-                <div class="media border p-3 mb-2 bg-dark text-light">
-                    <img src="/image/assistant.png" alt="caretaker" class="mr-3 rounded-circle" style="width:40px; height:40px;">
-                    <div class="media-body">
-                        <small class="text-muted d-block">${heading}</small>
-                        <p class="mb-0" style="white-space: pre-wrap;">${text}</p>
-                    </div>
-                </div>`;
+      const template = ''
+              + '<div class="media border p-3 mb-2 bg-dark text-light">\n'
+              + '    <img src="/image/assistant.png" alt="caretaker" class="mr-3 rounded-circle" style="width:40px; height:40px;">\n'
+              + '    <div class="media-body">\n'
+              + '        <small class="text-muted d-block">' + heading + '</small>\n'
+              + '        <p class="mb-0" style="white-space: pre-wrap;">' + safeText + '</p>\n'
+              + '    </div>\n'
+              + '</div>';
       container.append(template);
       container.scrollTop(container[0].scrollHeight);
     },
@@ -148,13 +159,15 @@
       if (!text) {
         return;
       }
+      const safeText = this.escapeHtml(text);
       const container = $('#dutyLog');
-      const template = `
-                <div class="border p-2 mb-2 bg-secondary text-light">
-                    <small class="text-warning d-block">시스템</small>
-                    <p class="mb-0">${text}</p>
-                </div>`;
+      const template = ''
+              + '<div class="border p-2 mb-2 bg-secondary text-light">\n'
+              + '    <small class="text-warning d-block">시스템</small>\n'
+              + '    <p class="mb-0" style="white-space: pre-wrap;">' + safeText + '</p>\n'
+              + '</div>';
       container.append(template);
+      container.scrollTop(container[0].scrollHeight);
     }
   };
 
@@ -164,35 +177,32 @@
 </script>
 
 <div class="col-sm-10">
-  <h2 class="mb-3">괴담 근무 진행</h2>
+  <h2 class="mb-3">매뉴얼 괴담 속 근무 진행</h2>
   <p class="text-muted">시나리오를 선택하면 첫 응답으로 근무 매뉴얼이 도착하고, 이후 질문은 매뉴얼을 기반으로 이어집니다.</p>
 
   <div class="card mb-4 border-info">
-    <div class="card-header bg-info text-dark">근무 시나리오 선택</div>
+    <div class="card-header bg-info text-dark">근무 매뉴얼 선택</div>
     <div class="card-body">
       <div class="form-row align-items-center">
         <div class="col-sm-5 my-1">
-          <input type="text" class="form-control" id="scenarioInput" placeholder="예) 폐병원 야간 경비"/>
-        </div>
-        <div class="col-sm-4 my-1">
-          <input type="text" class="form-control" id="dutyRumor" placeholder="최신 소문 (선택)"/>
+          <input type="text" class="form-control" id="scenarioInput" placeholder="예) 병원"/>
         </div>
         <div class="col-sm-3 my-1 text-right">
-          <button class="btn btn-outline-dark btn-block" type="button" id="startScenarioBtn">근무 시작</button>
+          <button class="btn btn-outline-dark btn-block" type="button" id="startScenarioBtn">근무 시작(매뉴얼 받아오기)</button>
         </div>
       </div>
-      <small class="form-text text-muted">시나리오 이름은 직접 입력하면 되며, 근무 시작 시 해당 이름으로 매뉴얼이 갱신됩니다.</small>
+      <small class="form-text text-muted">매뉴얼 이름은 직접 입력하면 되며, 근무 시작 시 해당 이름으로 매뉴얼이 갱신됩니다.</small>
     </div>
   </div>
 
   <div class="card mb-4 border-danger">
     <div class="card-header bg-dark text-danger d-flex justify-content-between align-items-center">
-      <span>상황 보고</span>
+      <span>질문</span>
       <button class="btn btn-outline-light btn-sm" type="button" id="resetSessionBtn">근무 초기화</button>
     </div>
     <div class="card-body">
       <div class="form-group">
-        <label for="dutyQuestion">질문 또는 보고 내용</label>
+        <label for="dutyQuestion">매뉴얼 관련 질문 사항</label>
         <textarea class="form-control" id="dutyQuestion" rows="3"
                   placeholder="예) 순찰 중 체육관에서 안내 방송이 나왔습니다. 어떻게 해야 하나요?"></textarea>
       </div>
@@ -203,9 +213,9 @@
   </div>
 
   <div class="card bg-secondary text-light">
-    <div class="card-header">근무 로그</div>
+    <div class="card-header">질문 로그</div>
     <div class="card-body" style="max-height: 360px; overflow-y:auto;" id="dutyLog">
-      <p class="text-muted">근무 매뉴얼과 규칙 업데이트가 이 영역에 순차적으로 표시됩니다.</p>
+      <p class="text-muted">근무 매뉴얼과 질문에 대한 답변이 영역에 순차적으로 표시됩니다.</p>
     </div>
   </div>
 </div>

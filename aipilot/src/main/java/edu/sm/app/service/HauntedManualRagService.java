@@ -18,18 +18,17 @@ import java.util.UUID;
 public class HauntedManualRagService {
 
     private final HauntedManualEtlService etlService;
-    private final ChatClient chatClient;
+    private final ChatClient.Builder chatClientBuilder;
+    private final SimpleLoggerAdvisor loggerAdvisor;
 
     public HauntedManualRagService(HauntedManualEtlService etlService,
                                    ChatMemory chatMemory,
                                    ChatClient.Builder chatClientBuilder) {
         this.etlService = etlService;
-        this.chatClient = chatClientBuilder
-                .defaultAdvisors(
-                        PromptChatMemoryAdvisor.builder(chatMemory).build(),
-                        new SimpleLoggerAdvisor(Ordered.LOWEST_PRECEDENCE - 1)
-                )
-                .build();
+        this.loggerAdvisor = new SimpleLoggerAdvisor(Ordered.LOWEST_PRECEDENCE - 1);
+        PromptChatMemoryAdvisor chatMemoryAdvisor = PromptChatMemoryAdvisor.builder(chatMemory).build();
+        this.chatClientBuilder = chatClientBuilder
+                .defaultAdvisors(chatMemoryAdvisor, this.loggerAdvisor);
     }
 
     public ManualStartResponse startScenario(String scenario,
@@ -68,6 +67,7 @@ public class HauntedManualRagService {
     private String callModel(String prompt,
                              String conversationId,
                              QuestionAnswerAdvisor advisor) {
+        ChatClient chatClient = chatClientBuilder.build();
         return chatClient.prompt()
                 .user(prompt)
                 .advisors(advisor)

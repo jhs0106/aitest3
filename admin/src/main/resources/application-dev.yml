@@ -1,0 +1,53 @@
+server:
+  port: 8444
+  ssl:
+    enabled: true
+    key-store: classpath:keystore.p12
+    key-store-password: ENC(Y6NgbbcggJp06p9ZnpSSAQ==)
+    key-store-type: PKCS12
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+spring:
+  config:
+    import: optional:file:.env[.properties] #.env import
+  mvc:
+    view:
+      prefix: /views/
+      suffix: .jsp
+  datasource:
+#    driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
+#    url: jdbc:log4jdbc:mysql://127.0.0.1:3306/shopdb?characterEncoding=utf8
+##    url: jdbc:mysql://127.0.0.1:3306/shopdb?serverTimezone=Asia/Seoul
+#    username: smuser
+#    password: ENC(Y6NgbbcggJp06p9ZnpSSAQ==)
+    url: jdbc:postgresql://localhost:5432/postgres
+    username: postgres
+    password: ENC(Y6NgbbcggJp06p9ZnpSSAQ==)
+mybatis:
+  type-aliases-package: edu.sm.app.dto
+  mapper-locations: classpath:/mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+logging:
+  level:
+    root: info
+
+# Application config
+# 이건 내가 만드는거
+app:
+  url:
+    sse: https://10.20.35.156:8444/ #admin
+    mainsse: https://10.20.35.156:8443/  #shop
+    websocketurl: https://10.20.35.156:8443/  #shop
+  dir:
+    imgsdir: file:///C:/smspring/imgs/     # 화면 출력 용
+    uploadimgsdir: C:/smspring/imgs/    # 파일 Write 용
+    logsdir: file:///C:/smspring/logs/     # 로그 출력 용
+    logsdirRead: C:/smspring/logs/ # Read용
+  key:
+    skey: ${MY_KEY}
+    algo: PBEWithMD5AndDES
+    wkey: ENC(34dLUJrGGnsDntd5cJlWzClgQg9sE4CzeMZNzIKOkR+NYVGuc3xeEBJvAqqI2ge0S5wlqnSXZ7xEu8xhJYpC+XRqENbH7xTKznIFOLpWsDo=)
+    owkey: ENC(PizbdAKnytpOVEjldzf4NRRapWa1ofzFIVESDA0bAejHF9UvCp/kH5g8hw/MCEKx)

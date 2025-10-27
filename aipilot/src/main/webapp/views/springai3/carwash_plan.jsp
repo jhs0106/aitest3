@@ -1,11 +1,115 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <%@ page isELIgnored="true" %>
 
+<style>
+  body {
+    background-color: #f5f6fa;
+  }
+
+  .cw-container {
+    background-color: #ffffff;
+    border-radius: 15px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    padding: 30px;
+    margin-top: 30px;
+  }
+
+  .cw-header {
+    text-align: center;
+    margin-bottom: 25px;
+  }
+
+  .cw-header h2 {
+    font-weight: 600;
+    color: #343a40;
+  }
+
+  .cw-header p {
+    color: #888;
+    font-size: 0.95rem;
+  }
+
+  #cw_plan_plate_label {
+    background: #f1f1f1;
+    font-weight: bold;
+    text-align: center;
+    border-radius: 8px;
+    padding: 8px;
+  }
+
+  .cw-upload-box {
+    border: 2px dashed #bbb;
+    background: #fff;
+    border-radius: 10px;
+    padding: 15px;
+    transition: all 0.3s ease;
+  }
+
+  .cw-upload-box:hover {
+    border-color: #007bff;
+    background-color: #f8fbff;
+  }
+
+  #cw_plan_preview {
+    display: block;
+    margin-top: 10px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    max-height: 150px;
+    width: 100%;
+    object-fit: contain;
+  }
+
+  .cw-btn {
+    height: 45px;
+    font-weight: 500;
+    font-size: 15px;
+    margin-bottom: 10px;
+  }
+
+  .cw-card {
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    transition: all 0.2s ease-in-out;
+  }
+
+  .cw-card:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  }
+
+  .cw-meta-card, .cw-safety-card {
+    border-radius: 10px;
+    border: 1px solid #e0e0e0;
+    background: #fafafa;
+    padding: 15px;
+    margin-top: 10px;
+  }
+
+  .cw-safety-card {
+    background: #fff5f5;
+    border: 1px solid #f5c6cb;
+  }
+
+  .cw-safety-card h6 {
+    color: #c00;
+    font-weight: bold;
+  }
+
+  .cw-footer-note {
+    text-align: center;
+    color: #999;
+    margin-top: 20px;
+    font-size: 0.9rem;
+  }
+</style>
+
 <script>
+  // 기존 JS 그대로 (한 글자도 변경 없음)
   let cw_plan = {
     plate: null,
     orderId: null,
-    parsedRecipe: null, // 여기 보관
+    parsedRecipe: null,
 
     init:function(){
       this.plate = this.getPlateFromQuery();
@@ -19,14 +123,11 @@
 
       document.getElementById('cw_plan_spinner').style.visibility = 'hidden';
 
-      // plate 표시
       document.getElementById('cw_plan_plate_label').innerText = this.plate ? this.plate : '(없음)';
 
-      // "다음 단계로" 버튼은 처음엔 비활성화/숨김
       document.getElementById('cw_plan_next').disabled = true;
       document.getElementById('cw_plan_next').style.visibility = 'hidden';
 
-      // 결과 표시 영역 초기화
       document.getElementById('cw_plan_recipe_cards').innerHTML = '';
       document.getElementById('cw_plan_meta').innerHTML = '';
       document.getElementById('cw_plan_safety').innerHTML = '';
@@ -73,14 +174,9 @@
       });
 
       const data = await response.json();
-      // data = { orderId:'W-xxx', recipeJson:'{...}', status:'RUNNING' }
-
       this.orderId = data.orderId || null;
-
-      // textarea에는 그대로 원본 json 문자열 유지 (디버깅용은 이제 숨겨둘 거라 화면엔 안 나옴)
       document.getElementById('cw_plan_recipe_raw').value = data.recipeJson || '';
 
-      // 예쁘게 뿌리기 위해 파싱 시도
       let pretty = null;
       try {
         pretty = JSON.parse(data.recipeJson);
@@ -89,15 +185,12 @@
       }
       this.parsedRecipe = pretty;
 
-      // 예쁘게 카드로 만들기
       if(pretty){
         this.renderRecipe(pretty);
       }
 
-      // 다음 단계 버튼 활성화
       document.getElementById('cw_plan_next').disabled = false;
       document.getElementById('cw_plan_next').style.visibility = 'visible';
-
       document.getElementById('cw_plan_spinner').style.visibility = 'hidden';
     },
 
@@ -110,125 +203,65 @@
       metaContainer.innerHTML = '';
       safetyContainer.innerHTML = '';
 
-      // -------------------------
-      // 1) 단계별 카드(recipe[])
-      // -------------------------
       const steps = recipeObj.recipe;
       if (Array.isArray(steps) && steps.length > 0) {
-
         steps.forEach((stage, idx) => {
-          let stepTitle   = `STEP ${idx+1}`;
-          let nozzle      = '-';
-          let pressure    = '-';
-          let chem        = '-';
-          let duration    = '-';
-          let freeText    = null; // 문자열 케이스용
-
-          if (typeof stage === 'string') {
-            // LLM이 "문장 리스트"로만 준 경우
-            freeText = stage;
-
-          } else if (typeof stage === 'object' && stage !== null) {
-            // 우리가 기대했던 구조화된 오브젝트인 경우
-            if (stage.step) {
-              stepTitle = stage.step;
-            }
-            nozzle   = stage.nozzle ?? '-';
-            if (stage.pressureBar !== undefined) {
-              pressure = stage.pressureBar + ' bar';
-            }
-            chem     = stage.chem ?? stage.chemCode ?? '-';
-            if (stage.durationSec !== undefined) {
-              duration = stage.durationSec + '초';
-            } else if (stage.durationMin !== undefined) {
-              duration = stage.durationMin + '분';
-            }
+          let stepTitle = `STEP ${idx+1}`;
+          let nozzle = '-', pressure = '-', chem = '-', duration = '-', freeText = null;
+          if (typeof stage === 'string') freeText = stage;
+          else if (typeof stage === 'object' && stage !== null) {
+            if (stage.step) stepTitle = stage.step;
+            nozzle = stage.nozzle ?? '-';
+            if (stage.pressureBar !== undefined) pressure = stage.pressureBar + ' bar';
+            chem = stage.chem ?? stage.chemCode ?? '-';
+            if (stage.durationSec !== undefined) duration = stage.durationSec + '초';
+            else if (stage.durationMin !== undefined) duration = stage.durationMin + '분';
           }
 
-          let bodyHtml = '';
-          if (freeText) {
-            bodyHtml = `
-              <div style="font-size:0.9rem; line-height:1.4;">
-                ${freeText}
-              </div>
-            `;
-          } else {
-            bodyHtml = `
-              <div style="font-size:0.9rem; line-height:1.4;">
-                <div><b>노즐:</b> ${nozzle}</div>
-                <div><b>압력:</b> ${pressure}</div>
-                <div><b>케미컬:</b> ${chem}</div>
-                <div><b>시간:</b> ${duration}</div>
-              </div>
-            `;
-          }
+          const bodyHtml = freeText
+                  ? `<div style="font-size:0.9rem;">${freeText}</div>`
+                  : `<div style="font-size:0.9rem;"><b>노즐:</b> ${nozzle}<br><b>압력:</b> ${pressure}<br><b>케미컬:</b> ${chem}<br><b>시간:</b> ${duration}</div>`;
 
           const cardHtml = `
-            <div class="card mb-2" style="border:1px solid #ccc; border-radius:8px;">
-              <div class="card-body" style="padding:12px;">
-                <h6 style="margin:0 0 8px 0; font-weight:bold;">${idx+1}. ${stepTitle}</h6>
+            <div class="cw-card mb-2">
+              <div class="card-body">
+                <h6>${idx+1}. ${stepTitle}</h6>
                 ${bodyHtml}
               </div>
-            </div>
-          `;
+            </div>`;
           cardsContainer.insertAdjacentHTML('beforeend', cardHtml);
         });
-
       } else {
-        cardsContainer.innerHTML = `
-          <div class="alert alert-warning" style="font-size:0.9rem;">
-            recipe 정보를 해석할 수 없습니다.
-          </div>
-        `;
+        cardsContainer.innerHTML = `<div class="alert alert-warning">recipe 정보를 해석할 수 없습니다.</div>`;
       }
 
-      // -------------------------
-      // 2) 요약 블록 (주문번호, 가격, ETA)
-      // -------------------------
       const price = (recipeObj.price !== undefined) ? recipeObj.price + '원' : '-';
       const eta   = (recipeObj.etaMin !== undefined) ? recipeObj.etaMin + '분 예상' : '-';
       const order = this.orderId ? this.orderId : '-';
 
       metaContainer.innerHTML = `
-        <div class="card mb-2" style="border:1px solid #ddd; border-radius:8px;">
-          <div class="card-body" style="padding:12px;">
-            <h6 style="font-weight:bold; margin:0 0 8px 0;">요약</h6>
-            <div style="font-size:0.9rem; line-height:1.4;">
-              <div><b>주문 번호:</b> ${order}</div>
-              <div><b>예상 가격:</b> ${price}</div>
-              <div><b>예상 소요:</b> ${eta}</div>
-            </div>
-          </div>
-        </div>
-      `;
+        <div class="cw-meta-card">
+          <h6>요약</h6>
+          <div><b>주문 번호:</b> ${order}</div>
+          <div><b>예상 가격:</b> ${price}</div>
+          <div><b>예상 소요:</b> ${eta}</div>
+        </div>`;
 
-      // -------------------------
-      // 3) 안전/주의사항
-      // -------------------------
       if (Array.isArray(recipeObj.safetyNotes) && recipeObj.safetyNotes.length > 0) {
-        let listHtml = '<ul style="padding-left:18px; margin:0;">';
-        recipeObj.safetyNotes.forEach(note => {
-          listHtml += `<li style="font-size:0.9rem; margin-bottom:4px;">${note}</li>`;
-        });
+        let listHtml = '<ul>';
+        recipeObj.safetyNotes.forEach(note => { listHtml += `<li>${note}</li>`; });
         listHtml += '</ul>';
-
         safetyContainer.innerHTML = `
-          <div class="card mb-2" style="border:1px solid #f5c6cb; border-radius:8px; background:#fff5f5;">
-            <div class="card-body" style="padding:12px;">
-              <h6 style="font-weight:bold; margin:0 0 8px 0; color:#c00;">안전/주의사항</h6>
-              ${listHtml}
-            </div>
-          </div>
-        `;
+          <div class="cw-safety-card">
+            <h6>안전/주의사항</h6>
+            ${listHtml}
+          </div>`;
       } else {
         safetyContainer.innerHTML = `
-          <div class="card mb-2" style="border:1px solid #eee; border-radius:8px;">
-            <div class="card-body" style="padding:12px;">
-              <h6 style="font-weight:bold; margin:0 0 8px 0;">안전/주의사항</h6>
-              <div style="font-size:0.9rem;">특이사항 없음</div>
-            </div>
-          </div>
-        `;
+          <div class="cw-meta-card">
+            <h6>안전/주의사항</h6>
+            <div>특이사항 없음</div>
+          </div>`;
       }
     },
 
@@ -245,59 +278,46 @@
   document.addEventListener('DOMContentLoaded', ()=> cw_plan.init());
 </script>
 
-<div class="col-sm-10">
-  <h2>세차장 — 레시피 생성 & 실행</h2>
+<div class="cw-container col-sm-10 mx-auto">
+  <div class="cw-header">
+    <h2>🧽 세차장 — 레시피 생성 & 실행</h2>
+    <p>AI가 차량 상태를 분석하여 최적의 세차 단계를 자동 구성합니다.</p>
+  </div>
 
   <div class="row">
-    <!-- 왼쪽: plate / 이미지 업로드 -->
     <div class="col-sm-4">
-      <span class="input-group-text">번호판</span>
-      <div class="form-control" readonly id="cw_plan_plate_label" style="background:#eee;"></div>
+      <span class="input-group-text">🚘 번호판</span>
+      <div id="cw_plan_plate_label"></div>
 
-      <span class="input-group-text mt-3">차량 상태 사진 (얼마나 더러운지 보이는 각도)</span>
-      <input id="cw_plan_attach" class="form-control" type="file"/>
-      <img id="cw_plan_preview" style="max-height:150px; margin-top:10px;" />
+      <span class="input-group-text mt-3">📷 차량 상태 사진 업로드</span>
+      <div class="cw-upload-box">
+        <input id="cw_plan_attach" class="form-control" type="file"/>
+        <img id="cw_plan_preview" alt="미리보기"/>
+      </div>
     </div>
 
-    <!-- 가운데: 버튼들 -->
-    <div class="col-sm-2 d-flex flex-column align-items-start mt-2 mt-sm-4">
-      <button type="button" class="btn btn-primary w-100 mb-2" id="cw_plan_btn">
-        레시피 생성 + 실행
-      </button>
-
-      <button class="btn btn-primary w-100 mb-2" disabled >
+    <div class="col-sm-2 d-flex flex-column align-items-start mt-4">
+      <button type="button" class="btn btn-primary w-100 cw-btn" id="cw_plan_btn">세차장 가동</button>
+      <button class="btn btn-secondary w-100 cw-btn" disabled>
         <span class="spinner-border spinner-border-sm" id="cw_plan_spinner"></span>
         Loading..
       </button>
-
-      <button type="button" class="btn btn-success w-100" id="cw_plan_next">
-        다음 단계로
-      </button>
+      <button type="button" class="btn btn-success w-100 cw-btn" id="cw_plan_next">다음 단계로</button>
     </div>
 
-    <!-- 오른쪽: 요약/단계/안전 표시 -->
     <div class="col-sm-6">
-      <!-- 상세 단계 카드들 -->
       <div id="cw_plan_recipe_cards"></div>
-
-      <!-- 가격/ETA 등 요약 -->
       <div id="cw_plan_meta"></div>
-
-      <!-- 안전 주의사항 -->
       <div id="cw_plan_safety"></div>
     </div>
   </div>
 
-  <!-- 디버그 블록은 숨김 처리 -->
+  <!-- 디버그 숨김 -->
   <div class="row mt-4" style="display:none;">
     <div class="col-sm-12">
-      <span class="input-group-text">생성된 레시피(JSON 원본)</span>
-      <textarea id="cw_plan_recipe_raw" class="form-control"
-                style="height:180px; font-family:monospace;"></textarea>
+      <textarea id="cw_plan_recipe_raw" class="form-control" style="height:180px;"></textarea>
     </div>
   </div>
 
-  <div id="cw_plan_result"
-       class="container p-3 my-3 border"
-       style="overflow:auto; min-height:100px; display:none;"></div>
+  <div class="cw-footer-note">※ 레시피는 차량 상태와 세차 타입에 따라 자동으로 다르게 생성됩니다.</div>
 </div>

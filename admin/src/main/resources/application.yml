@@ -1,0 +1,4 @@
+spring:
+  profiles:
+    active: dev
+#    dev환경을 읽어 실행

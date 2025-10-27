@@ -20,46 +20,58 @@ public class CarwashEntryService {
     private final BarrierControlService barrierControlService;
     private final GateLogService gateLogService;
 
-    /**
-     * 입차 처리:
-     *  1) 번호판 인식
-     *  2) vehicle 테이블에서 기존고객 여부 확인
-     *  3) 차단봉 올릴지 / 내릴지 결정
-     *  4) ENTRY 로그 기록
-     *  5) plate, known, barrier 상태를 반환
-     */
+    /** 프런트: /ai6/entry-image 에서 호출 */
     public EntryResult handleEntryImage(String contentType, byte[] imageBytes) {
 
-        // 1. 번호판 인식 (LLM 비전)
+        // 1. 번호판 인식
         String plate = recognizePlate(contentType, imageBytes);
+        plate = (plate != null) ? plate.replaceAll("\\s+","") : null;
 
-        // 2. 기존고객 여부: vehicle 테이블 확인
-        boolean known = jdbcCarRegistry.isKnownCar(plate);
+        if (plate == null || plate.isBlank()) {
+            // 인식 실패 시: 차단봉은 닫고, known=false 로 응답
+            log.warn("[ENTRY] plate 인식 실패. barrier CLOSE 유지.");
+            barrierControlService.down();
 
-        // (선택) 만약 신규 고객도 vehicle에 저장해 두고 싶으면:
-        // jdbcCarRegistry.upsertVehicleOnEntry(plate);
+            // 로그: 최소한 시도한건 ENTRY로 남겨줄 수도 있고, 애매하면 안 남겨도 된다.
+            // 여기선 아예 plate 없이 남기는 건 의미 없으니 스킵
 
-        // 3. 차단봉 제어
-        if (known) {
-            barrierControlService.up();      // 기존 고객이면 바로 열어준다
-        } else {
-            barrierControlService.down();    // 신규면 일단 닫아둔다(혹은 열어도 되고 정책에 따라)
+            EntryResult failRes = new EntryResult();
+            failRes.setPlate("(UNKNOWN)");
+            failRes.setKnown(false);
+            failRes.setBarrier("DOWN");
+            return failRes;
         }
 
-        // 4. 입차 로그 기록 (ENTRY)
-        gateLogService.logEntry(plate);
+        // 2. 기존 고객 여부 확인
+        boolean alreadyKnown = jdbcCarRegistry.isKnownCar(plate);
 
-        // 5. 결과 DTO 구성
+        // 3. 신규라면 vehicle에 INSERT (ON CONFLICT DO NOTHING -> 기존이면 무시)
+        jdbcCarRegistry.upsertVehicleOnEntry(plate);
+
+        // 4. 차단봉 제어 정책
+        if (alreadyKnown) {
+            barrierControlService.up();     // 기존 고객이면 자동 오픈
+        } else {
+            barrierControlService.down();   // 신규면 우선 닫아둔다 (정책에 따라 바꿀 수 있음)
+        }
+
+        // 5. 게이트 로그 기록
+        gateLogService.logEntry(plate);
+        if (alreadyKnown) {
+            gateLogService.logGateOpen(plate);   // known 고객: 열린 상태
+        } else {
+            gateLogService.logGateClose(plate);  // unknown 고객: 닫힌 상태
+        }
+
+        // 6. 결과 DTO 만들어서 반환
         EntryResult result = new EntryResult();
         result.setPlate(plate);
-        result.setKnown(known);
-        result.setBarrier(known ? "UP" : "DOWN"); // 프론트에서 "차단봉:" 옆에 뿌릴 용도
+        result.setKnown(alreadyKnown);
+        result.setBarrier(alreadyKnown ? "UP" : "DOWN");
         return result;
     }
 
-    /**
-     * LLM으로 이미지에서 번호판만 추출
-     */
+    /** LLM 비전으로 번호판 문자열만 추출 */
     private String recognizePlate(String contentType, byte[] bytes) {
         Media media = Media.builder()
                 .mimeType(MimeType.valueOf(contentType))
@@ -68,9 +80,9 @@ public class CarwashEntryService {
 
         UserMessage userMessage = UserMessage.builder()
                 .text("""
-                    이미지에서 자동차 번호판을 인식하세요.
-                    한국 번호판 형식(예: '12가3456', '157고4895')만 추출하고,
-                    다른 설명 없이 그 번호판만 텍스트로 반환하세요.
+                    이미지에서 한국 자동차 번호판을 인식하세요.
+                    예: "12가3456", "157고4895"
+                    다른 단어나 설명 없이, 번호판만 한 줄로 출력하세요.
                 """)
                 .media(media)
                 .build();
@@ -81,19 +93,18 @@ public class CarwashEntryService {
                 .prompt()
                 .messages(userMessage)
                 .call()
-                .content()
-                .trim();
+                .content();
 
-        // 혹시 공백 섞여있으면 제거
-        String plate = raw.replaceAll("\\s+", "");
+        if (raw == null) return null;
+        String plate = raw.trim().replaceAll("\\s+","");
         log.info("[ENTRY] 인식된 번호판 plate={}", plate);
         return plate;
     }
 
     @lombok.Data
     public static class EntryResult {
-        private String plate;    // 인식된 번호판
-        private boolean known;   // 기존고객 여부 (vehicle에 있으면 true)
-        private String barrier;  // 'UP' or 'DOWN'
+        private String plate;    // "157고4895"
+        private boolean known;   // DB에 이미 등록돼 있던 차인지 여부
+        private String barrier;  // "UP" 또는 "DOWN"
     }
 }

@@ -329,7 +329,7 @@
 
                         <c:choose>
                             <c:when test="${sessionScope.admin == null}">
-                                <a href="#" data-toggle="modal" data-target="#loginModal">login</a>
+                                <a href="#" data-toggle="modal" data-target="#loginModal"></a>
                             </c:when>
                             <c:otherwise>
                                 <li class="nav-item dropdown no-arrow">

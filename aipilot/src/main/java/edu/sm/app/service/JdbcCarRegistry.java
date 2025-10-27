@@ -10,9 +10,7 @@ public class JdbcCarRegistry {
 
     private final JdbcTemplate jdbc;
 
-    /**
-     * vehicle 테이블에 해당 번호판이 있으면 기존 고객으로 본다.
-     */
+    // 1) 지금 이 차가 DB에 이미 있는지?
     public boolean isKnownCar(String plate) {
         Integer cnt = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM vehicle WHERE plate = ?",
@@ -22,17 +20,15 @@ public class JdbcCarRegistry {
         return (cnt != null && cnt > 0);
     }
 
-    /**
-     * 만약 plate가 아직 없다면 신규고객이니까 vehicle에 최소 정보라도 넣어준다.
-     * 이건 선택적(아래에서 어디서 호출할지 결정)
-     */
+    // 2) 차가 없으면 INSERT 해서 vehicle에 등록
     public void upsertVehicleOnEntry(String plate) {
-        // 이미 있으면 아무것도 안 하고,
-        // 없으면 최소 row를 만든다 (처음 본 차라도 이후 단계에서 쓸 수 있게)
         jdbc.update("""
             INSERT INTO vehicle (plate, last_wash_at)
             VALUES (?, NOW())
             ON CONFLICT (plate) DO NOTHING
         """, plate);
     }
+
+    // (참고) 세차 끝났을 때 색상/사이즈 업데이트하는 용도로도 이런 메서드가 있었지?
+    // public void updateVehicleAfterWash(... ) { ... }
 }

@@ -139,9 +139,6 @@
         <td>${s.stepIdx}</td>
         <td>${escapeHtml(s.stepName)}</td>
         <td>${s.startedAt || ''}</td>
-        <td>${s.endedAt || ''}</td>
-        <td>${s.pressureBar != null ? s.pressureBar : ''}</td>
-        <td>${s.chemCode || ''}</td>
         <td>${s.result || ''}</td>
       </tr>
     `;
@@ -164,9 +161,6 @@
             <th style="width:50px;">idx</th>
             <th>단계 이름</th>
             <th style="width:140px;">시작</th>
-            <th style="width:140px;">종료</th>
-            <th style="width:80px;">압력(bar)</th>
-            <th style="width:120px;">케미컬</th>
             <th style="width:90px;">결과</th>
           </tr>
         </thead>

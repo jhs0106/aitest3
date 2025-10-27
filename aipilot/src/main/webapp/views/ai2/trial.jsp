@@ -543,7 +543,9 @@
     let trial = {
         sending: false,
         sessionId: null,
-        currentRoleId: 'prosecutor',
+        currentRoleId: 'defendant', // 피고인
+        isTrialCompleted: false,
+
         roles: {
             judge: {
                 id: 'judge',
@@ -604,9 +606,12 @@
             }
 
             this.bindInputInteractions();
-            this.setupRoleSelection();
+            // this.setupRoleSelection(); // 처음엔 역할 선택 비활성화
+            this.disableRoleSelection();
             this.updateSendButtonState();
             this.updateRoleChip();
+
+            this.showInitialMessage();
         },
 
         bindInputInteractions: function() {
@@ -639,6 +644,38 @@
             this.setRole(this.currentRoleId);
         },
 
+        // ⭐ 역할 선택 비활성화
+        disableRoleSelection: function() {
+            const cards = document.querySelectorAll('.role-card');
+            cards.forEach(card => {
+                card.style.opacity = '0.5';
+                card.style.pointerEvents = 'none';
+                card.style.cursor = 'not-allowed';
+            });
+
+            // 피고인만 활성화 표시
+            const defCard = document.querySelector('.role-card[data-role="defendant"]');
+            if (defCard) {
+                defCard.style.opacity = '1';
+                defCard.classList.add('active');
+            }
+        },
+
+        // ⭐ 역할 선택 활성화 (재판 종료 후)
+        enableRoleSelection: function() {
+            const cards = document.querySelectorAll('.role-card');
+            cards.forEach(card => {
+                card.style.opacity = '1';
+                card.style.pointerEvents = 'auto';
+                card.style.cursor = 'pointer';
+
+                card.addEventListener('click', () => {
+                    const roleId = card.getAttribute('data-role');
+                    this.setRole(roleId);
+                });
+            });
+        },
+
         setRole: function(roleId) {
             if (!this.roles[roleId]) {
                 return;
@@ -653,6 +690,24 @@
 
             this.updateRoleChip();
             this.syncPlaceholder();
+        },
+
+        // ⭐ 초기 AI 메시지
+        showInitialMessage: function() {
+            const chatArea = document.getElementById('trialChatArea');
+            if (!chatArea) return;
+
+            const initialMsg = `개정을 선언합니다. 피고인 김철수님은 형법 제329조 절도 혐의로 기소되었습니다.
+피고인께서는 진술할 권리가 있으며, 진술을 거부할 권리도 있습니다.
+먼저 피고인의 진술을 듣겠습니다.`;
+
+            // 기존 초기 메시지 제거
+            const existing = chatArea.querySelector('.message.role-ai');
+            if (existing) {
+                existing.remove();
+            }
+
+            this.addAIMessage(initialMsg);
         },
 
         syncPlaceholder: function() {
@@ -840,6 +895,123 @@
             }
         },
 
+        // ⭐ AI 자동 진행
+        aiAutoProceed: function() {
+            if (this.sending) return;
+
+            this.sending = true;
+            this.updateSendButtonState();
+
+            const loadingId = this.addLoadingMessage();
+            const url = '/ai2/api/trial-ai-proceed?sessionId=' + encodeURIComponent(this.sessionId);
+
+            const eventSource = new EventSource(url);
+            let aiResponse = '';
+            let aiMessageId = null;
+
+            eventSource.onmessage = (event) => {
+                if (event.data === '[DONE]') {
+                    eventSource.close();
+                    this.removeLoadingMessage(loadingId);
+                    this.sending = false;
+                    this.updateSendButtonState();
+                    return;
+                }
+
+                aiResponse += event.data;
+
+                if (!aiMessageId) {
+                    this.removeLoadingMessage(loadingId);
+                    aiMessageId = this.addAIMessage(aiResponse);
+                } else {
+                    this.updateAIMessage(aiMessageId, aiResponse);
+                }
+            };
+
+            eventSource.onerror = () => {
+                eventSource.close();
+                this.removeLoadingMessage(loadingId);
+                this.sending = false;
+                this.updateSendButtonState();
+            };
+        },
+
+        // ⭐ 판결 생성
+        generateVerdict: function() {
+            if (this.sending) return;
+
+            this.sending = true;
+            this.updateSendButtonState();
+
+            const loadingId = this.addLoadingMessage();
+            const url = '/ai2/api/trial-verdict?sessionId=' + encodeURIComponent(this.sessionId);
+
+            const eventSource = new EventSource(url);
+            let verdictText = '';
+            let messageId = null;
+
+            eventSource.onmessage = (event) => {
+                if (event.data === '[DONE]') {
+                    eventSource.close();
+                    this.removeLoadingMessage(loadingId);
+                    this.sending = false;
+                    this.updateSendButtonState();
+                    return;
+                }
+
+                verdictText += event.data;
+
+                if (!messageId) {
+                    this.removeLoadingMessage(loadingId);
+                    messageId = this.addAIMessage(verdictText);
+
+                    // ⭐ 판결 메시지 스타일 변경
+                    const msgDiv = document.getElementById(messageId);
+                    if (msgDiv) {
+                        msgDiv.style.background = 'linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%)';
+                        msgDiv.style.borderLeft = '4px solid #ff9800';
+                    }
+                } else {
+                    this.updateAIMessage(messageId, verdictText);
+                }
+            };
+
+            eventSource.onerror = () => {
+                eventSource.close();
+                this.removeLoadingMessage(loadingId);
+                this.sending = false;
+                this.updateSendButtonState();
+            };
+        },
+
+        // ⭐ 재판 종료
+        completeTrial: function() {
+            if (!confirm('재판을 종료하시겠습니까? 종료 후 다른 역할로 전환할 수 있습니다.')) {
+                return;
+            }
+
+            this.isTrialCompleted = true;
+
+            // 역할 선택 활성화
+            this.enableRoleSelection();
+
+            // 메시지 추가
+            const chatArea = document.getElementById('trialChatArea');
+            if (chatArea) {
+                const completeMsg = document.createElement('div');
+                completeMsg.className = 'alert alert-success text-center';
+                completeMsg.style.margin = '20px';
+                completeMsg.innerHTML = `
+            <strong>✅ 재판이 종료되었습니다.</strong><br>
+            이제 다른 역할(판사/검사/변호사)을 선택하여 재판을 체험할 수 있습니다.
+        `;
+                chatArea.appendChild(completeMsg);
+                this.scrollToBottom();
+            }
+
+            alert('재판이 종료되었습니다. 왼쪽에서 다른 역할을 선택할 수 있습니다.');
+        },
+
         createAvatar: function(role) {
             const avatar = document.createElement('div');
             avatar.className = 'message-avatar';
@@ -987,18 +1159,33 @@
                 </div>
 
                 <div class="input-panel">
-                    <span class="active-role-chip" id="activeRoleChip">검사 발언 준비</span>
+                    <span class="active-role-chip" id="activeRoleChip">피고인 발언 준비</span>
                     <div class="input-group">
                         <div class="input-field-wrapper">
                             <label for="trialInput">선택한 역할의 발언 내용</label>
                             <textarea id="trialInput"
-                                      placeholder="검사의 관점에서 메시지를 입력하세요..."
-                                      autocomplete="off"
-                                      aria-label="모의 재판 메시지 입력"></textarea>
+                                      placeholder="피고인의 관점에서 메시지를 입력하세요..."
+                                      autocomplete="off"></textarea>
                         </div>
-                        <button type="button" id="trialSendBtn" onclick="trial.send()" aria-label="메시지 전송" disabled>
+                        <button type="button" id="trialSendBtn" onclick="trial.send()">
                             발언 등록
                             <span class="btn-icon">➤</span>
+                        </button>
+                    </div>
+
+                    <!-- ⭐ 추가 버튼들 -->
+                    <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="trial.aiAutoProceed()">
+                            🤖 AI 자동 진행
+                        </button>
+                        <button type="button" class="btn btn-warning btn-sm" onclick="trial.generateVerdict()">
+                            ⚖️ 판결 생성
+                        </button>
+                        <button type="button" class="btn btn-success btn-sm" onclick="trial.completeTrial()">
+                            ✅ 재판 종료
+                        </button>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="location.reload()">
+                            🔄 초기화
                         </button>
                     </div>
                 </div>

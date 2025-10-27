@@ -105,7 +105,7 @@
         <!-- Card Body -->
         <div class="card-body">
           <div class="ops-wrap">
-            <h2>🗂 운영 가이드 RAG 관리</h2>
+            <h2>🗂 운영 가이드 벡터스토어 관리</h2>
             <div class="ops-desc">
               현장 운영 매뉴얼 / 장비 점검 절차 / 고객 응대 가이드라인 같은 문서를 업로드하면
               LLM이 사장님 질문에 그 내용을 근거로 답변할 수 있게 됩니다.
@@ -151,7 +151,7 @@
 
             <!-- 테스트 질의 -->
             <div class="ops-block">
-              <label>운영 매뉴얼 RAG 테스트 질문</label>
+              <label>운영 매뉴얼 테스트 질문</label>
               <div class="ask-row">
       <textarea id="ops_question"
                 placeholder="예) 폼샴푸 라인 압력 떨어졌을 때 점검 순서 알려줘"></textarea>

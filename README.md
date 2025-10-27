@@ -56,3 +56,145 @@
 - **근무 시작**: 해당하는 매뉴얼 이름 선택 `/api/haunted/manual/start`에 전달해 매뉴얼을 받아오고, 응답으로 받은 근무 매뉴얼을 로그에 표시 // 위치: aipilot/src/main/webapp/views/hauntedmanual/duty.jsp, aipilot/src/main/webapp/views/hauntedmanual/duty.jsp
 - **질문 처리**: 근무자 질문을 `/api/haunted/manual/ask`로 전송하여 규칙 업데이트 메시지를 받고 로그에 추가합니다. 사용자 발화와 AI 응답은 각각 다른 스타일로 나옴. // 위치: aipilot/src/main/webapp/views/hauntedmanual/duty.jsp, aipilot/src/main/webapp/views/hauntedmanual/duty.jsp
 - **세션 초기화 & 상태 로그**: 근무 세션을 초기화하면 대화 기록을 비우고 상태 메시지를 제공하며, 모든 로그는 스크롤 영역에 순차적으로 누적됨.
+
+## 3. Trial(모의 재판) 시스템
+이 기능은 사용자가 가상의 법정에서 다양한 역할(판사, 검사, 변호인 등)을 수행하며 AI 기반으로 사건을 진행하고 판결을 생성하는 인터랙티브 시뮬레이션 환경을 제공함.
+
+### 주요 화면 (Layout & UI)
+- **역할 선택 패널**: 좌측에 위치하며, 7가지 역할 카드(판사, 검사, 변호인, 피고인, 증인, 참심위원, AI 재판부)가 아이콘과 설명으로 표시되어 클릭 시 역할 전환이 가능함.  
+  → **위치:** `aipilot/src/main/webapp/views/trial/center.jsp`
+- **대화 패널**: 우측에서 역할별 발언이 표시되며 SSE 스트리밍을 통해 AI 응답이 실시간으로 출력됨.
+- **하단 컨트롤 영역**: 발언 입력창과 ‘판결 생성’, ‘재판 종료’, ‘초기화’ 버튼이 배치되어 주요 조작을 한 화면에서 수행 가능.
+- **세션 관리**: 페이지 로드시 브라우저 `sessionStorage`에 `sessionId` 저장, 사건이 없을 경우 선택 안내를 표시.
+
+### 주요 기능 (Case & Session)
+- **사건 목록 조회**: `/ai2/api/trial-cases` 호출로 형사/민사 사건 목록을 받아오고, 모달창에서 사건 유형·피고인·혐의를 확인 후 재판 시작 가능.
+- **세션 매핑 관리**: `TrialSessionManager`가 `sessionId`와 사건을 매핑하며, 초기 역할(피고인)을 설정해 역할별 대화 맥락을 분리.
+- **재판 종료 처리**: `/ai2/api/trial-complete` 호출 시 사건 상태를 `closed`로 변경하고 세션 초기화.
+
+### 주요 기능 (Role System & Messaging)
+- **역할 전환**: `/ai2/api/trial-switch-role` 호출로 역할 변경, 서버는 사건 요약과 안내 메시지를 반환.  
+- **대화 흐름**: 메시지 전송 시 자동으로 `[판사]`, `[검사]` 등의 말머리 추가, SSE 스트리밍으로 AI 응답 표시.  
+- **역할별 시스템 프롬프트(RoleInstruction)**:  
+  - 판사 → “공정성 유지”  
+  - 검사 → “증거 입증”  
+  - 변호인 → “정상참작”  
+  등의 역할 특성에 맞는 지침이 적용됨.
+
+### 주요 기능 (Memory 관리)
+- **대화 맥락 유지**: 각 역할은 `sessionId-roleId` 형태의 독립 `conversationId`를 가지며, `PromptChatMemoryAdvisor`로 이전 대화 참고.  
+- **사건 포함 프롬프트**: 사건 정보가 시스템 프롬프트에 삽입되어 맥락 유지형 답변 제공.
+
+### 주요 기능 (Function Calling)
+- **TrialRoleTools**: 실제 재판 절차를 시뮬레이션하는 4가지 도구 함수 제공  
+  - `judgeOpenTrial()` : 개정 선언문 생성 (사건번호, 피고인, 혐의 포함)  
+  - `prosecutorProsecute()` : 검사의 기소 및 구형 메시지  
+  - `attorneyDefend()` : 변호인의 변론 및 정상참작 요청  
+  - `judgeVerdict()` : 판결문 선고 메시지 생성  
+
+### 주요 기능 (AI 보조 기능)
+- **개정 선언 생성**: `startTrialWithCase()`에서 사건 정보 기반으로 오프닝 메시지 자동 생성 (형사/민사별 문구 차등).  
+- **판결 생성**: `/ai2/api/trial-verdict` SSE 스트리밍 방식으로 판결문 생성.  
+  포함 요소:
+  - 사건 개요
+  - 법조문
+  - 진술 요약
+  - 구형 요약
+  - 변론 요약
+  - 정상참작 사유
+  - 형량
+  - 판결 이유
+- **법률 자문 (RAG 기반)**: `/ai2/api/legal-advice` 호출 시 벡터 스토어에서 관련 법률 문서 검색 후 자문 제공.  
+- **통합 재판 모드**: `/ai2/api/trial-full`에서 Memory와 RAG를 결합하여 맥락 + 지식 기반 재판 진행.
+
+### 주요 API 엔드포인트
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET | /ai2/api/trial-cases | 사건 목록 조회 |
+| GET | /ai2/api/trial-session-info | 현재 세션 정보 조회 |
+| GET | /ai2/api/trial-start | 사건 선택 및 재판 시작 (SSE) |
+| POST | /ai2/api/trial-switch-role | 역할 전환 |
+| GET | /ai2/api/trial-chat | 기본 재판 채팅 (SSE) |
+| GET | /ai2/api/trial-memory-chat | Memory 기반 재판 (SSE) |
+| GET | /ai2/api/legal-advice | RAG 법률 자문 (SSE) |
+| GET | /ai2/api/trial-full | Memory + RAG 통합 재판 (SSE) |
+| GET | /ai2/api/trial-ai-proceed | AI 자동 진행 (SSE) |
+| GET | /ai2/api/trial-verdict | 판결 생성 (SSE) |
+| POST | /ai2/api/trial-complete | 재판 종료 |
+
+### 데이터베이스 구조 (trial_case)
+| 필드명 | 타입 | 설명 |
+|--------|------|------|
+| case_id | INT (PK) | 사건 고유 ID |
+| case_number | VARCHAR | 사건번호 (예: 2024고단1234) |
+| case_type | VARCHAR | 사건 유형 (‘criminal’, ‘civil’) |
+| defendant | VARCHAR | 피고인 이름 |
+| charge | VARCHAR | 혐의 또는 청구 내용 |
+| description | TEXT | 사건 개요 |
+| status | VARCHAR | 상태 (‘registered’, ‘in_progress’, ‘closed’) |
+| verdict | TEXT | 판결 내용 |
+| created_at | TIMESTAMP | 생성 일시 |
+| updated_at | TIMESTAMP | 수정 일시 |
+
+
+---
+
+## 4. Smart-Home 제어 시스템
+이 기능은 사용자의 음성·텍스트 명령을 기반으로 난방, 조명, 환기 등 IoT 기기를 제어하고, 매뉴얼 문서 기반의 RAG 검색 및 Memory 대화를 제공함.
+
+### 주요 화면 (탭 구성)
+- **RAG 검색 탭**: 매뉴얼에서 정보 검색. 입력창, 결과 표시, 샘플 질문, 업로드 안내 포함.  
+- **Memory 대화 탭**: SSE 기반 실시간 대화 UI 제공.  
+- **문서 업로드 탭**: PDF/DOCX/TXT 파일 업로드 가능.  
+- **디바이스 상태 탭**: 난방·조명·환기 등 실시간 상태 표시 (색상 피드백 제공).  
+  → **위치:** `aipilot/src/main/webapp/views/smarthome/center.jsp`
+
+### 주요 기능 (Backend Architecture)
+- **API 네임스페이스**: `/ai2/api` 하위 모든 엔드포인트 구성.  
+- **음성 명령 처리**:  
+  - STT(Speech-to-Text) → IoT 제어 → TTS(Text-to-Speech) 파이프라인  
+  - `OpenAiAudioTranscriptionModel`, `OpenAiAudioSpeechModel` 활용  
+  - 생성된 음성은 Base64 인코딩 후 브라우저 재생.  
+- **텍스트 명령 처리**: Function Calling 기반 기기 제어.  
+- **RAG 검색 및 Memory 대화**: 매뉴얼 기반 정보 검색과 사용자 맞춤 대화 수행.
+
+### 주요 기능 (IoT 제어 Function)
+- **Ai2IotTools** 3가지 도구 제공:  
+  - `controlHeating(boolean on)` : 난방 제어  
+  - `controlLight(boolean on)` : 조명 제어  
+  - `controlVentilation(boolean on)` : 환기 제어  
+- 기기 상태는 `ConcurrentHashMap`으로 관리하며, 자연어 명령(“춥다”, “불 켜줘”)을 AI가 자동 분석 후 호출.
+
+### 주요 기능 (RAG 파이프라인)
+- **문서 파싱**:  
+  - PDF → `ParagraphPdfDocumentReader`  
+  - DOCX → `TikaDocumentReader`  
+  - TXT → `TextReader`  
+- **벡터 저장소 구성**: `TokenTextSplitter`로 분할 후 type 메타데이터와 함께 저장.  
+  `TRUNCATE TABLE vector_store` 로 초기화 가능.  
+- **RAG 검색**: 상위 3개 문서(유사도 ≥ 0.5)를 기반으로 `QuestionAnswerAdvisor`로 답변 생성.
+
+### 주요 기능 (센서 및 상태 관리)
+- **센서 데이터 시뮬레이션**:  
+  - 온도(18-32℃), 습도(40-80%), 조도(100-1000 lux) 범위의 랜덤 값 생성.  
+- **디바이스 상태 표시**: `/ai2/api/device-status` 호출로 상태 조회.  
+  - ON → 초록색, OFF → 빨간색으로 표시.  
+  - jQuery의 `loadDeviceStatus()` / `updateDeviceUI(data)` 로 화면 갱신.
+
+### 주요 기능 (Memory 대화)
+- **대화 ID 관리**: `HttpSession`의 `sessionId`를 `conversationId`로 사용.  
+- **PromptChatMemoryAdvisor**로 과거 대화 참조, 사용자의 선호도(예: 온도 설정) 학습.  
+- **맥락 의존 명령 처리**: “어제처럼 해줘”, “내가 좋아하는 온도” 등 실행 가능.
+
+### 주요 API 엔드포인트
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET | /ai2/api/sensor-data | 센서 데이터 조회 |
+| POST | /ai2/api/voice-control | 음성 명령 처리 (multipart/form-data) |
+| POST | /ai2/api/text-control | 텍스트 명령 처리 (JSON) |
+| POST | /ai2/api/rag-search | RAG 매뉴얼 검색 (JSON) |
+| GET | /ai2/api/memory-chat | Memory 기반 채팅 (SSE) |
+| POST | /ai2/api/upload-document | 문서 업로드 |
+| POST | /ai2/api/clear-vector | 벡터 저장소 초기화 |
+| GET | /ai2/api/device-status | 디바이스 상태 조회 |
+

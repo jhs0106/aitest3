@@ -37,5 +37,23 @@ public class SpringAI3Controller {
         model.addAttribute("left", dir+"left");
         return "index";
     }
+    @RequestMapping("/gatelog")
+    public String gatelog(Model model) {
+        model.addAttribute("center", dir+"gatelog");
+        model.addAttribute("left", dir+"left");
+        return "index";
+    }
+    @RequestMapping("/vehicle")
+    public String vehicle(Model model) {
+        model.addAttribute("center", dir+"vehicle");
+        model.addAttribute("left", dir+"left");
+        return "index";
+    }
+    @RequestMapping("/washorder")
+    public String washorder(Model model) {
+        model.addAttribute("center", dir+"washorder");
+        model.addAttribute("left", dir+"left");
+        return "index";
+    }
     
 }

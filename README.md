@@ -1,7 +1,7 @@
 ### 🧑‍💻TEAM 3 - springai4~5 기술 기반 기능 구현
 ***
-### 시연 영상 : [![Video Label](http://img.youtube.com/vi/JNBo558s100/0.jpg)]
-
+### 시연 영상 : [![Video Label](http://img.youtube.com/vi/zlSSEia3yD0/0.jpg)]
+https://www.youtube.com/watch?v=zlSSEia3yD0
 ***
 # 🎯 주제
 -  Spring Boot와 JSP 그리고 OpenAI API를 중심으로 구축된 spring ai4~5 기술 기반 기능 구현 

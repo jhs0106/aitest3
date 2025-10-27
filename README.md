@@ -375,3 +375,85 @@ AI가 **실시간 CCTV 프레임**을 분석해 **화재/사고/응급** 등 위
 | name | VARCHAR(100)  | 출입 시도 사용자 이름 |
 | status | VARCHAR(10)  | 출입 결과 상태  |
 | access_time | TIMESTAMP | 출입 시각  |
+
+***
+# db에 필요한 테이블들(sql 스크립트)
+```
+-- 차량 테이블
+CREATE TABLE IF NOT EXISTS vehicle (
+                                       plate         TEXT PRIMARY KEY,        -- 번호판
+                                       customer_id   BIGINT NULL,             -- 고객ID
+                                       model         TEXT NULL,               -- 차종
+                                       size          TEXT NULL,               -- compact/midsize/suv 등.
+                                       color         TEXT NULL,               -- black/white
+                                       last_wash_at  TIMESTAMP NULL           -- 마지막 세차시간. 세차 시작할 때 now()로 갱신
+);
+
+```
+
+```
+-- 세차 주문 테이블
+CREATE TABLE IF NOT EXISTS wash_order (
+                                          id           TEXT PRIMARY KEY,         -- 주문번호
+                                          plate        TEXT NOT NULL,            -- vehicle.plate 참조
+                                          recipe_json  TEXT NOT NULL,            -- LLM이 만든 전체 레시피 JSON
+                                          status       TEXT NOT NULL,            -- RUNNING / DONE 등
+                                          price        INTEGER NULL,             -- 예상 금액
+                                          eta_min      INTEGER NULL,             -- 예상 시간(분)
+                                          created_at   TIMESTAMP NOT NULL DEFAULT NOW()
+);
+```
+
+```
+-- 세차 로그 테이블
+CREATE TABLE IF NOT EXISTS wash_log (
+                                        id            BIGSERIAL PRIMARY KEY,
+                                        order_id      TEXT NOT NULL,          -- wash_order.id
+                                        step_idx      INTEGER NOT NULL,       -- 0,1,2
+                                        step_name     TEXT NOT NULL,          -- preRinse, foam, rinse
+                                        started_at    TIMESTAMP NULL,         -- 실제 시작 시간
+                                        ended_at      TIMESTAMP NULL,         -- 아직 안끝났으면 NULL
+                                        pressure_bar  INTEGER NULL,           -- 계획된/실제 압력
+                                        chem_code     TEXT NULL,              -- 계획된/실제 케미컬
+                                        result        TEXT NULL               -- PENDING / OK / ERROR 등
+);
+
+```
+
+```
+-- 세차장 차단봉 로그
+CREATE TABLE IF NOT EXISTS carwash_gate_log (
+                                                id          BIGSERIAL PRIMARY KEY,
+                                                plate       TEXT        NOT NULL,          -- 번호판
+                                                event_type  TEXT        NOT NULL,          -- 'ENTRY' 또는 'EXIT'
+                                                logged_at   TIMESTAMP   NOT NULL DEFAULT NOW()
+);
+
+```
+
+```
+-- AI 얼굴 인식 출입 시스템 등록 사용자 정보
+CREATE TABLE IF NOT EXISTS door_user (
+                                         id BIGSERIAL PRIMARY KEY,
+                                         name VARCHAR(100) NOT NULL UNIQUE,
+                                         face_signature TEXT NOT NULL,
+                                         created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE door_user IS 'AI 얼굴 인식 출입 시스템 등록 사용자 정보';
+COMMENT ON COLUMN door_user.name IS '사용자 이름 (Unique)';
+COMMENT ON COLUMN door_user.face_signature IS 'AI가 분석한 얼굴 특징 텍스트 (Face Signature)';
+```
+```
+-- AI 얼굴 인식 출입 기록
+CREATE TABLE IF NOT EXISTS door_access_record (
+                                                  id BIGSERIAL PRIMARY KEY,
+                                                  name VARCHAR(100) NOT NULL,
+                                                  status VARCHAR(10) NOT NULL,
+                                                  access_time TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE door_access_record IS 'AI 얼굴 인식 출입 기록';
+COMMENT ON COLUMN door_access_record.name IS '출입 시도 사용자 이름';
+COMMENT ON COLUMN door_access_record.status IS '출입 결과 상태 (SUCCESS/FAILED)';
+COMMENT ON COLUMN door_access_record.access_time IS '출입 시각';
+```

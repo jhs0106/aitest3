@@ -1,6 +1,31 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 
+<style>
+  .haunted-spinner-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1050;
+  }
+
+  .haunted-spinner-overlay.active {
+    display: flex;
+  }
+</style>
+
+<div class="haunted-spinner-overlay" id="hauntedSetupSpinner" aria-hidden="true">
+  <div class="spinner-border text-light" role="status" aria-live="polite" aria-label="LLM 요청 처리 중">
+    <span class="sr-only">요청을 처리 중입니다...</span>
+  </div>
+</div>
+
 <script>
   const hauntedSetup = {
     currentScenario: '',
@@ -52,6 +77,7 @@
       const formData = new FormData();
       formData.append('scenario', this.currentScenario);
       formData.append('attach', file);
+      this.showSpinner();
       try {
         this.appendLog("'" + file.name + "' 문서 업로드를 요청했습니다.", 'operator');
         const response = await fetch('/api/haunted/manual/upload', {
@@ -63,9 +89,12 @@
       } catch (error) {
         console.error('uploadManual error', error);
         this.appendLog('문서를 업로드하지 못했습니다. 다시 시도하세요.', 'system');
+      } finally {
+        this.hideSpinner();
       }
     },
     clearVectorStore: async function () {
+      this.showSpinner();
       try {
         this.appendLog('괴담 규칙 벡터 저장소 초기화를 요청했습니다.', 'operator');
         const response = await fetch('/api/haunted/manual/clear', {
@@ -76,6 +105,8 @@
       } catch (error) {
         console.error('clearVectorStore error', error);
         this.appendLog('벡터 저장소 초기화에 실패했습니다.', 'system');
+      } finally {
+        this.hideSpinner();
       }
     },
     escapeHtml: function (text) {
@@ -104,6 +135,12 @@
               + '</div>';
       container.append(template);
       container.scrollTop(container[0].scrollHeight);
+    },
+    showSpinner: function () {
+      $('#hauntedSetupSpinner').addClass('active').attr('aria-hidden', 'false');
+    },
+    hideSpinner: function () {
+      $('#hauntedSetupSpinner').removeClass('active').attr('aria-hidden', 'true');
     }
   };
 

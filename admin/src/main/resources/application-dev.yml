@@ -25,6 +25,26 @@ spring:
     url: jdbc:postgresql://localhost:5432/postgres
     username: postgres
     password: ENC(Y6NgbbcggJp06p9ZnpSSAQ==)
+  ai:
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        dimensions: 1536   # OpenAI text-embedding-3-small 기준
+    openai:
+      #      api-key: ENC(L+3uhYyzFraYAepdMksKBmunOFhPzXIbEN0FsTWp9GazpaaEpjfIVRYqJrcqy9a9)
+      #      chat:
+      #        options:
+      #          model: gemini-2.0-flash
+      #          temperature: 0.0
+      #          max-tokens: 1000
+      #        completions-path: /v1/chat/completions
+      #        base-url: https://generativelanguage.googleapis.com/v1beta/openai/
+      api-key: ENC(+T9SWaH75QZqZr5jsSY/GPfYhyJSiku54nYHGBHzq2D8M6Ri7sq3QXgWNzqalZw1kxI4ewSWJ5sbOH0zCQt6418r05/ShuliVIYKCWLIZtjMAOwzahzqKH+vtkWOlu2v5C3XBYdZYl2/14oOWDyR6yjYFNOTyCBOpxAEphIYS2SVMLqr6rTbFFN1RpBFs4Iko7C3Lmx1PdzADzBqyCezj4u+2PCSYN4ChZKtLrY7QnI=)
+      chat:
+        options:
+          model: gpt-4o
+          temperature: 0.1
+          max-tokens: 1000
 mybatis:
   type-aliases-package: edu.sm.app.dto
   mapper-locations: classpath:/mapper/*.xml

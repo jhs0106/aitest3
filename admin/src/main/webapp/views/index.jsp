@@ -117,8 +117,7 @@
                             <h6 class="collapse-header">Customer Management:</h6>
                             <a class="collapse-item" href="<c:url value="/gatelog"/>">GateLog</a>
                             <a class="collapse-item" href="<c:url value="/vehicle"/>">Vehicle</a>
-                            <a class="collapse-item" href="<c:url value="/washorder"/>">WashOrder</a>
-
+                            <a class="collapse-item" href="<c:url value="/washorder"/>">washorder</a>
                         </div>
                     </div>
                 </li>
@@ -128,14 +127,14 @@
                     <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseUtilities"
                        aria-expanded="true" aria-controls="collapseUtilities">
                         <i class="fas fa-fw fa-wrench"></i>
-                        <span>Item</span>
+                        <span>Ai Guide</span>
                     </a>
                     <div id="collapseUtilities" class="collapse" aria-labelledby="headingUtilities"
                          data-parent="#accordionSidebar">
                         <div class="bg-white py-2 collapse-inner rounded">
-                            <h6 class="collapse-header">Item Management:</h6>
-                            <a class="collapse-item" href="<c:url value="/item/add"/>">Add</a>
-                            <a class="collapse-item" href="<c:url value="/item/get"/>">Get</a>
+                            <h6 class="collapse-header">Ai Guide:</h6>
+                            <a class="collapse-item" href="<c:url value="/ownerreport"/>">Owner Report</a>
+                            <a class="collapse-item" href="<c:url value="/opsguideadmin"/>">ops_guide_admin</a>
                         </div>
                     </div>
                 </li>

@@ -51,9 +51,8 @@ public class SpringAI3Controller {
     }
     @RequestMapping("/washorder")
     public String washorder(Model model) {
-        model.addAttribute("center", dir+"washorder");
-        model.addAttribute("left", dir+"left");
+        model.addAttribute("center", dir + "washorder");
+        model.addAttribute("left", dir + "left");
         return "index";
     }
-    
 }

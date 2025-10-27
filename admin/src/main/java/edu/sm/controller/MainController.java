@@ -1,12 +1,9 @@
-package edu.sm.controlloer;
+package edu.sm.controller;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
-
-import java.util.List;
 
 @Controller
 @Slf4j
@@ -30,6 +27,17 @@ public class MainController {
     @RequestMapping("/vehicle")
     public String vehicle(Model model) throws Exception {
         model.addAttribute("center", "vehicle");
+        return "index";
+    }
+    @RequestMapping("/ownerreport")
+    public String ownerreport(Model model) throws Exception {
+        model.addAttribute("center", "ownerreport");
+        return "index";
+    }
+
+    @RequestMapping("/opsguideadmin")
+    public String opsguideadmin(Model model) throws Exception {
+        model.addAttribute("center", "opsguideadmin");
         return "index";
     }
 

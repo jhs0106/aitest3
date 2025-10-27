@@ -5,7 +5,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Bootstrap 4 Website Example</title>
+    <title>Ai test</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -28,7 +28,7 @@
 <body>
 
 <div class="jumbotron text-center" style="margin-bottom:0">
-    <h1>Item Management</h1>
+    <h1>Team3 Ai Test</h1>
 </div>
 <ul class="nav justify-content-end">
     <li class="nav-item">

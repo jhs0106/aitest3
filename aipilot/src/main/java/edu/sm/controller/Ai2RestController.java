@@ -84,9 +84,11 @@ public class Ai2RestController {
      * 기본 재판 채팅 (기존 메서드 유지)
      */
     @GetMapping(value = "/trial-chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> trialChat(@RequestParam("message") String message) {
-        log.info("모의 법정 채팅 - 메시지: {}", message);
-        return trialService.chat(message);
+    public Flux<String> trialChat(
+            @RequestParam("message") String message,
+            @RequestParam(value = "role", required = false) String role) {
+        log.info("모의 법정 채팅 - 역할: {}, 메시지: {}", role, message);
+        return trialService.chat(message, role);
     }
 
     /**

@@ -2,237 +2,787 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 
 <style>
-    .trial-container {
-        background: white;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    :root {
+        --color-background: #f3f4f8;
+        --color-panel: #ffffff;
+        --color-border: #e2e8f0;
+        --color-ink: #1f2937;
+        --color-muted: #6b7280;
+        --color-highlight: #b89c6d;
+        --shadow-panel: 0 18px 45px rgba(15, 23, 42, 0.12);
+        font-family: 'Pretendard', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background-color: var(--color-background);
+    }
+
+    .trial-shell {
+        width: 100%;
+        padding: 28px 16px 40px;
+        background: linear-gradient(180deg, rgba(223, 215, 196, 0.45) 0%, rgba(240, 245, 255, 0.9) 60%, rgba(243, 244, 248, 1) 100%);
+        border-radius: 28px;
+        position: relative;
         overflow: hidden;
     }
-    .trial-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 20px;
-        text-align: center;
+
+    .trial-shell::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(circle at 16% 8%, rgba(255, 255, 255, 0.9), transparent 55%),
+        radial-gradient(circle at 82% 0%, rgba(232, 223, 209, 0.7), transparent 65%);
     }
-    .chat-area {
-        height: 500px;
-        overflow-y: auto;
-        padding: 20px;
-        background-color: #fafafa;
+
+    .trial-layout {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 24px;
+        min-height: 640px;
     }
-    .message {
-        margin-bottom: 20px;
-        display: flex;
-        align-items: flex-start;
+
+    .trial-panel {
+        background: var(--color-panel);
+        border-radius: 22px;
+        box-shadow: var(--shadow-panel);
+        border: 1px solid var(--color-border);
+        overflow: hidden;
     }
-    .message.user {
-        flex-direction: row-reverse;
+
+    .trial-panel__header {
+        padding: 28px 30px 24px;
+        background: linear-gradient(145deg, rgba(27, 40, 69, 0.92) 0%, rgba(41, 57, 90, 0.95) 100%);
+        color: #fff;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
-    .message-avatar {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background-color: #667eea;
+
+    .trial-panel__header h2 {
+        margin: 0 0 10px;
+        font-size: 1.65rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+    }
+
+    .trial-panel__header p {
+        margin: 0;
+        color: rgba(255, 255, 255, 0.78);
+        font-size: 0.95rem;
+        line-height: 1.5;
+    }
+
+    .stage-indicator {
+        margin-top: 18px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.12);
         display: flex;
         align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: bold;
-        flex-shrink: 0;
+        gap: 12px;
+        font-size: 0.86rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
     }
-    .message.user .message-avatar {
-        background-color: #764ba2;
+
+    .stage-indicator::before {
+        content: '\2696';
+        font-size: 1.1rem;
     }
-    .message-content {
-        max-width: 70%;
-        padding: 12px 16px;
-        border-radius: 12px;
-        margin: 0 10px;
-        word-wrap: break-word;
-    }
-    .message.ai .message-content {
-        background-color: white;
-        border: 1px solid #e0e0e0;
-    }
-    .message.user .message-content {
-        background-color: #667eea;
-        color: white;
-    }
-    .input-area {
-        padding: 20px;
-        background-color: white;
-        border-top: 1px solid #e0e0e0;
-    }
-    .input-group-custom {
+
+    .roles-panel {
         display: flex;
+        flex-direction: column;
+        padding: 20px 22px 26px;
+        gap: 18px;
+    }
+
+    .roles-panel__intro {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.95rem;
+        color: var(--color-muted);
+        line-height: 1.6;
+    }
+
+    .roles-panel__intro strong {
+        color: var(--color-ink);
+        font-weight: 600;
+    }
+
+    .role-grid {
+        display: grid;
+        gap: 14px;
+    }
+
+    .role-card {
+        position: relative;
+        padding: 16px 18px 18px;
+        border-radius: 18px;
+        border: 1px solid var(--color-border);
+        background: rgba(255, 255, 255, 0.86);
+        box-shadow: 0 14px 28px rgba(15, 23, 42, 0.05);
+        cursor: pointer;
+        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    }
+
+    .role-card::before {
+        content: attr(data-icon);
+        font-size: 1.4rem;
+        display: inline-flex;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        align-items: center;
+        justify-content: center;
+        background: rgba(27, 40, 69, 0.08);
+        margin-bottom: 12px;
+    }
+
+    .role-card h3 {
+        margin: 0 0 6px;
+        font-size: 1.05rem;
+        color: var(--color-ink);
+    }
+
+    .role-card p {
+        margin: 0;
+        font-size: 0.85rem;
+        color: var(--color-muted);
+        line-height: 1.5;
+    }
+
+    .role-card.active {
+        transform: translateY(-2px);
+        border-color: rgba(184, 156, 109, 0.8);
+        box-shadow: 0 18px 36px rgba(184, 156, 109, 0.25);
+        background: linear-gradient(155deg, rgba(255, 255, 255, 0.95) 0%, rgba(249, 244, 235, 0.9) 100%);
+    }
+
+    .role-card.active::after {
+        content: '현재 발언자';
+        position: absolute;
+        top: 16px;
+        right: 18px;
+        font-size: 0.72rem;
+        letter-spacing: 0.04em;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: rgba(184, 156, 109, 0.14);
+        color: #7b5b2b;
+    }
+
+    .chat-panel {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    .chat-panel__header {
+        padding: 26px 32px 20px;
+        border-bottom: 1px solid var(--color-border);
+        background: var(--color-panel);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .chat-panel__header-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .chat-title {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--color-ink);
+    }
+
+    .case-chip {
+        padding: 8px 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(27, 40, 69, 0.15);
+        background: rgba(27, 40, 69, 0.04);
+        font-size: 0.82rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #3f4a63;
+    }
+
+    .chat-panel__header p {
+        margin: 0;
+        font-size: 0.92rem;
+        color: var(--color-muted);
+        line-height: 1.6;
+    }
+
+    .chat-area {
+        flex: 1;
+        padding: 28px 32px 24px;
+        background: linear-gradient(180deg, rgba(249, 247, 243, 0.6) 0%, rgba(255, 255, 255, 0.8) 100%);
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+    }
+
+    .chat-area::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .chat-area::-webkit-scrollbar-thumb {
+        background: rgba(27, 40, 69, 0.2);
+        border-radius: 10px;
+    }
+
+    .message {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+        --accent: rgba(27, 40, 69, 0.76);
+    }
+
+    .message-avatar {
+        width: 46px;
+        height: 46px;
+        border-radius: 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        color: #fff;
+        background: var(--accent);
+        box-shadow: 0 12px 24px rgba(27, 40, 69, 0.25);
+    }
+
+    .message-content {
+        position: relative;
+        max-width: min(72%, 620px);
+        padding: 18px 20px 20px;
+        border-radius: 18px;
+        background: #fff;
+        border: 1px solid rgba(31, 41, 55, 0.08);
+        box-shadow: 0 18px 32px rgba(15, 23, 42, 0.1);
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .message.human .message-content {
+        background: #fffdf6;
+        border: 1px solid rgba(184, 156, 109, 0.35);
+        box-shadow: 0 18px 36px rgba(184, 156, 109, 0.22);
+    }
+
+    .message-content::before {
+        content: '';
+        position: absolute;
+        top: 18px;
+        left: -12px;
+        width: 12px;
+        height: 12px;
+        background: inherit;
+        border-left: inherit;
+        border-bottom: inherit;
+        transform: rotate(45deg);
+    }
+
+    .message-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 10px;
+    }
+
+    .message-label::before {
+        content: '';
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--accent);
+    }
+
+    .message-text {
+        margin: 0;
+        font-size: 0.98rem;
+        line-height: 1.68;
+        color: var(--color-ink);
+        white-space: pre-wrap;
+        word-break: keep-all;
+    }
+
+    .message.human .message-text {
+        color: #3f321f;
+    }
+
+    .message-meta {
+        display: block;
+        margin-top: 12px;
+        font-size: 0.78rem;
+        color: var(--color-muted);
+    }
+
+    .message.role-ai {
+        --accent: #334155;
+    }
+
+    .message.role-judge {
+        --accent: #7a5c2a;
+    }
+
+    .message.role-prosecutor {
+        --accent: #be4d2d;
+    }
+
+    .message.role-defender {
+        --accent: #2d6fb8;
+    }
+
+    .message.role-defendant {
+        --accent: #0f766e;
+    }
+
+    .message.role-witness {
+        --accent: #a855f7;
+    }
+
+    .message.role-jury {
+        --accent: #6366f1;
+    }
+
+    .input-panel {
+        padding: 22px 28px 26px;
+        border-top: 1px solid var(--color-border);
+        background: var(--color-panel);
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .active-role-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        align-self: flex-start;
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(184, 156, 109, 0.6);
+        background: rgba(249, 244, 235, 0.7);
+        font-size: 0.8rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #7b5b2b;
+    }
+
+    .active-role-chip::before {
+        content: '\25B6';
+        font-size: 0.7rem;
+    }
+
+    .input-group {
+        display: flex;
+        align-items: flex-end;
+        gap: 14px;
+    }
+
+    .input-field-wrapper {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
         gap: 10px;
     }
-    #trialInput {
-        flex: 1;
-        padding: 12px;
-        border: 2px solid #e0e0e0;
-        border-radius: 8px;
+
+    label[for="trialInput"] {
+        font-size: 0.82rem;
+        color: var(--color-muted);
+        letter-spacing: 0.02em;
     }
+
+    #trialInput {
+        width: 100%;
+        min-height: 88px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        border: 1px solid var(--color-border);
+        background: rgba(255, 255, 255, 0.95);
+        font-size: 1rem;
+        line-height: 1.65;
+        color: var(--color-ink);
+        resize: vertical;
+        transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
     #trialInput:focus {
         outline: none;
-        border-color: #667eea;
+        border-color: rgba(184, 156, 109, 0.7);
+        box-shadow: 0 0 0 4px rgba(184, 156, 109, 0.16);
     }
+
     #trialSendBtn {
-        padding: 12px 24px;
-        background-color: #667eea;
-        color: white;
+        padding: 16px 24px;
+        border-radius: 16px;
         border: none;
-        border-radius: 8px;
+        background: linear-gradient(155deg, #b89c6d 0%, #8a6f3c 100%);
+        color: #fff;
+        font-weight: 600;
+        letter-spacing: 0.02em;
         cursor: pointer;
-        font-weight: bold;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 18px 28px rgba(138, 111, 60, 0.28);
+        transition: transform 0.15s ease, box-shadow 0.18s ease;
     }
-    #trialSendBtn:hover {
-        background-color: #5568d3;
+
+    #trialSendBtn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 22px 32px rgba(138, 111, 60, 0.32);
     }
+
     #trialSendBtn:disabled {
-        background-color: #ccc;
+        opacity: 0.5;
         cursor: not-allowed;
+        box-shadow: none;
+        transform: none;
     }
+
+    .btn-icon {
+        font-size: 1rem;
+        transform: translateX(0);
+        transition: transform 0.18s ease;
+    }
+
+    #trialSendBtn:hover:not(:disabled) .btn-icon {
+        transform: translateX(2px);
+    }
+
     .loading {
-        display: inline-block;
-        padding: 8px 12px;
-        background-color: #f0f0f0;
-        border-radius: 8px;
-        font-style: italic;
-        color: #666;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--color-muted);
+        font-size: 0.9rem;
+    }
+
+    .loading-spinner {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 2px solid rgba(27, 40, 69, 0.18);
+        border-top-color: rgba(27, 40, 69, 0.8);
+        animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    @media (max-width: 1100px) {
+        .trial-layout {
+            grid-template-columns: 280px 1fr;
+        }
+    }
+
+    @media (max-width: 880px) {
+        .trial-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .roles-panel {
+            flex-direction: row;
+            overflow-x: auto;
+        }
+
+        .role-grid {
+            display: flex;
+            gap: 12px;
+        }
+
+        .role-card {
+            min-width: 200px;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .trial-shell {
+            padding: 22px 12px 28px;
+        }
+
+        .chat-panel__header,
+        .chat-area,
+        .input-panel {
+            padding-left: 18px;
+            padding-right: 18px;
+        }
+
+        .message-content {
+            max-width: 100%;
+        }
+
+        .input-group {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        #trialSendBtn {
+            justify-content: center;
+            width: 100%;
+        }
     }
 </style>
 
 <script>
     let trial = {
         sending: false,
-        sessionId: null,  // 세션 ID
+        sessionId: null,
+        currentRoleId: 'prosecutor',
+        roles: {
+            judge: {
+                id: 'judge',
+                label: '재판장',
+                icon: '⚖️',
+                summary: '절차 진행과 판결을 담당합니다.',
+                promptPrefix: '[재판장]'
+            },
+            prosecutor: {
+                id: 'prosecutor',
+                label: '검사',
+                icon: '🧾',
+                summary: '공소 사실 입증과 증거 제시 역할을 맡습니다.',
+                promptPrefix: '[검사]'
+            },
+            defender: {
+                id: 'defender',
+                label: '변호인',
+                icon: '🛡️',
+                summary: '피고인의 주장을 정리하고 반박 전략을 세웁니다.',
+                promptPrefix: '[변호인]'
+            },
+            defendant: {
+                id: 'defendant',
+                label: '피고인',
+                icon: '👤',
+                summary: '사건에 대한 입장을 직접 진술합니다.',
+                promptPrefix: '[피고인]'
+            },
+            witness: {
+                id: 'witness',
+                label: '증인',
+                icon: '🗣️',
+                summary: '사건과 관련된 사실을 진술합니다.',
+                promptPrefix: '[증인]'
+            },
+            jury: {
+                id: 'jury',
+                label: '참심위원',
+                icon: '👥',
+                summary: '배심원 또는 시민 참여자의 의견을 공유합니다.',
+                promptPrefix: '[참심위원]'
+            },
+            ai: {
+                id: 'ai',
+                label: 'AI 재판부',
+                icon: 'AI',
+                summary: '',
+                promptPrefix: ''
+            }
+        },
 
         init: function() {
-            console.log('=== 모의 법정 초기화 ===');
-
-            // 세션 ID 생성 (브라우저 새로고침해도 유지)
             this.sessionId = sessionStorage.getItem('trial-session-id');
             if (!this.sessionId) {
                 this.sessionId = 'trial-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
                 sessionStorage.setItem('trial-session-id', this.sessionId);
             }
-            console.log('세션 ID:', this.sessionId);
 
-            const chatArea = document.getElementById('trialChatArea');
-            console.log('채팅 영역 찾기:', chatArea ? '성공' : '실패');
+            this.bindInputInteractions();
+            this.setupRoleSelection();
+            this.updateSendButtonState();
+            this.updateRoleChip();
+        },
+
+        bindInputInteractions: function() {
+            const input = document.getElementById('trialInput');
+            if (!input) {
+                return;
+            }
+
+            input.addEventListener('input', () => {
+                this.updateSendButtonState();
+            });
+
+            input.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    this.send();
+                }
+            });
+        },
+
+        setupRoleSelection: function() {
+            const cards = document.querySelectorAll('.role-card');
+            cards.forEach(card => {
+                card.addEventListener('click', () => {
+                    const roleId = card.getAttribute('data-role');
+                    this.setRole(roleId);
+                });
+            });
+
+            this.setRole(this.currentRoleId);
+        },
+
+        setRole: function(roleId) {
+            if (!this.roles[roleId]) {
+                return;
+            }
+
+            this.currentRoleId = roleId;
+
+            document.querySelectorAll('.role-card').forEach(card => {
+                const isActive = card.getAttribute('data-role') === roleId;
+                card.classList.toggle('active', isActive);
+            });
+
+            this.updateRoleChip();
+            this.syncPlaceholder();
+        },
+
+        syncPlaceholder: function() {
+            const input = document.getElementById('trialInput');
+            const role = this.roles[this.currentRoleId];
+            if (input && role) {
+                input.placeholder = role.label + '의 관점에서 메시지를 입력하세요...';
+            }
+        },
+
+        updateRoleChip: function() {
+            const chip = document.getElementById('activeRoleChip');
+            const role = this.roles[this.currentRoleId];
+            if (chip && role) {
+                chip.textContent = role.label + ' 발언 준비';
+            }
         },
 
         send: function() {
-            console.log('=== send() 호출 ===');
+            if (this.sending) {
+                return;
+            }
 
             const input = document.getElementById('trialInput');
-            const sendBtn = document.getElementById('trialSendBtn');
+            if (!input) {
+                return;
+            }
+
             const message = input.value.trim();
-
-            console.log('입력 메시지:', message);
-
             if (!message) {
-                alert('메시지를 입력하세요.');
+                input.focus();
                 return;
             }
 
-            if (this.sending) {
-                console.log('이미 전송 중...');
-                return;
-            }
+            const role = this.roles[this.currentRoleId];
+            const decoratedMessage = role && role.promptPrefix ? role.promptPrefix + ' ' + message : message;
 
             this.sending = true;
-            sendBtn.disabled = true;
+            this.updateSendButtonState();
 
-            // 1. 사용자 메시지 표시
-            console.log('1. 사용자 메시지 추가');
-            this.addUserMessage(message);
+            this.addUserMessage(message, role);
             input.value = '';
+            this.updateSendButtonState();
 
-            // 2. 로딩 표시
-            console.log('2. 로딩 표시');
             const loadingId = this.addLoadingMessage();
-
-            // 3. AI 응답 받기
-            console.log('3. AI 응답 요청');
-            this.fetchAIResponse(message, loadingId, sendBtn);
+            this.fetchAIResponse(decoratedMessage, loadingId);
         },
 
-        addUserMessage: function(text) {
+        addUserMessage: function(text, role) {
             const chatArea = document.getElementById('trialChatArea');
+            if (!chatArea || !role) {
+                return;
+            }
 
             const messageDiv = document.createElement('div');
-            messageDiv.className = 'message user';
+            messageDiv.className = 'message human role-' + role.id;
+            messageDiv.style.setProperty('--accent', this.pickAccent(role.id));
 
-            // avatar 생성
-            const avatar = document.createElement('div');
-            avatar.className = 'message-avatar';
-            avatar.textContent = '나';
-
-            // content 생성
-            const content = document.createElement('div');
-            content.className = 'message-content';
-            content.textContent = text;  // textContent는 자동으로 escape
-
-            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(this.createAvatar(role));
+            const { content } = this.createMessageContent(role, text);
             messageDiv.appendChild(content);
-            chatArea.appendChild(messageDiv);
 
+            chatArea.appendChild(messageDiv);
             this.scrollToBottom();
-            console.log('✓ 사용자 메시지 추가 완료');
         },
 
         addLoadingMessage: function() {
             const chatArea = document.getElementById('trialChatArea');
-            const loadingId = 'loading-' + Date.now();
+            if (!chatArea) {
+                return null;
+            }
 
+            const loadingId = 'loading-' + Date.now();
             const loadingDiv = document.createElement('div');
             loadingDiv.id = loadingId;
-            loadingDiv.className = 'message ai';
+            loadingDiv.className = 'message role-ai';
+            loadingDiv.style.setProperty('--accent', this.pickAccent('ai'));
 
-            // avatar 생성
-            const avatar = document.createElement('div');
-            avatar.className = 'message-avatar';
-            avatar.textContent = '판';
+            loadingDiv.appendChild(this.createAvatar(this.roles.ai));
 
-            // loading 생성
+            const content = document.createElement('div');
+            content.className = 'message-content';
+
+            const label = document.createElement('span');
+            label.className = 'message-label';
+            label.textContent = 'AI 재판부';
+
             const loading = document.createElement('div');
             loading.className = 'loading';
-            loading.textContent = '답변 생성 중...';
 
-            loadingDiv.appendChild(avatar);
-            loadingDiv.appendChild(loading);
+            const spinner = document.createElement('span');
+            spinner.className = 'loading-spinner';
+
+            const loadingText = document.createElement('span');
+            loadingText.textContent = '답변을 준비 중입니다...';
+
+            loading.appendChild(spinner);
+            loading.appendChild(loadingText);
+
+            content.appendChild(label);
+            content.appendChild(loading);
+
+            loadingDiv.appendChild(content);
             chatArea.appendChild(loadingDiv);
 
             this.scrollToBottom();
-            console.log('✓ 로딩 메시지 추가 완료');
             return loadingId;
         },
 
-        fetchAIResponse: function(message, loadingId, sendBtn) {
+        fetchAIResponse: function(message, loadingId) {
             const url = '/ai2/api/trial-chat?message=' + encodeURIComponent(message) +
                     '&sessionId=' + encodeURIComponent(this.sessionId);
-            console.log('API 호출:', url);
 
             const eventSource = new EventSource(url);
             let aiResponse = '';
             let aiMessageId = null;
 
             eventSource.onmessage = (event) => {
-                console.log('응답 청크:', event.data);
-
-                // 로딩 제거
-                const loadingDiv = document.getElementById(loadingId);
-                if (loadingDiv) {
-                    loadingDiv.remove();
+                if (event.data === '[DONE]') {
+                    eventSource.close();
+                    this.removeLoadingMessage(loadingId);
+                    this.sending = false;
+                    this.updateSendButtonState();
+                    return;
                 }
 
-                // 응답 누적
                 aiResponse += event.data;
 
-                // AI 메시지 업데이트
                 if (!aiMessageId) {
+                    this.removeLoadingMessage(loadingId);
                     aiMessageId = this.addAIMessage(aiResponse);
                 } else {
                     this.updateAIMessage(aiMessageId, aiResponse);
@@ -240,45 +790,31 @@
             };
 
             eventSource.onerror = () => {
-                console.log('스트리밍 종료');
                 eventSource.close();
-
-                // 로딩 제거
-                const loadingDiv = document.getElementById(loadingId);
-                if (loadingDiv) {
-                    loadingDiv.remove();
-                }
-
-                // 전송 가능 상태로
+                this.removeLoadingMessage(loadingId);
                 this.sending = false;
-                sendBtn.disabled = false;
-
-                console.log('✓ 대화 완료');
+                this.updateSendButtonState();
             };
         },
 
         addAIMessage: function(text) {
             const chatArea = document.getElementById('trialChatArea');
-            const messageId = 'ai-msg-' + Date.now();
+            if (!chatArea) {
+                return null;
+            }
 
+            const messageId = 'ai-' + Date.now();
+            const role = this.roles.ai;
             const messageDiv = document.createElement('div');
             messageDiv.id = messageId;
-            messageDiv.className = 'message ai';
+            messageDiv.className = 'message role-ai';
+            messageDiv.style.setProperty('--accent', this.pickAccent('ai'));
 
-            // avatar 생성
-            const avatar = document.createElement('div');
-            avatar.className = 'message-avatar';
-            avatar.textContent = '판';
-
-            // content 생성
-            const content = document.createElement('div');
-            content.className = 'message-content';
-            content.textContent = text;  // textContent는 자동으로 escape
-
-            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(this.createAvatar(role));
+            const { content, textElement } = this.createMessageContent(role, text);
             messageDiv.appendChild(content);
-            chatArea.appendChild(messageDiv);
 
+            chatArea.appendChild(messageDiv);
             this.scrollToBottom();
             return messageId;
         },
@@ -286,12 +822,92 @@
         updateAIMessage: function(messageId, text) {
             const messageDiv = document.getElementById(messageId);
             if (messageDiv) {
-                const content = messageDiv.querySelector('.message-content');
-                if (content) {
-                    content.textContent = text;
+                const textNode = messageDiv.querySelector('.message-text');
+                if (textNode) {
+                    textNode.textContent = text;
                 }
             }
             this.scrollToBottom();
+        },
+
+        removeLoadingMessage: function(loadingId) {
+            if (!loadingId) {
+                return;
+            }
+            const loadingDiv = document.getElementById(loadingId);
+            if (loadingDiv) {
+                loadingDiv.remove();
+            }
+        },
+
+        createAvatar: function(role) {
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            avatar.textContent = role.icon || '•';
+            avatar.setAttribute('aria-hidden', 'true');
+            return avatar;
+        },
+
+        createMessageContent: function(role, text) {
+            const content = document.createElement('div');
+            content.className = 'message-content';
+
+            const label = document.createElement('span');
+            label.className = 'message-label';
+            label.textContent = role.label;
+
+            const textElement = document.createElement('p');
+            textElement.className = 'message-text';
+            textElement.textContent = text;
+
+            const meta = document.createElement('span');
+            meta.className = 'message-meta';
+            meta.textContent = this.formatTimestamp();
+
+            content.appendChild(label);
+            content.appendChild(textElement);
+            content.appendChild(meta);
+
+            return { content, textElement };
+        },
+
+        pickAccent: function(roleId) {
+            switch (roleId) {
+                case 'judge':
+                    return '#7a5c2a';
+                case 'prosecutor':
+                    return '#be4d2d';
+                case 'defender':
+                    return '#2d6fb8';
+                case 'defendant':
+                    return '#0f766e';
+                case 'witness':
+                    return '#a855f7';
+                case 'jury':
+                    return '#6366f1';
+                default:
+                    return '#334155';
+            }
+        },
+
+        formatTimestamp: function(date = new Date()) {
+            const hours = date.getHours();
+            const minutes = date.getMinutes().toString().padStart(2, '0');
+            const period = hours >= 12 ? '오후' : '오전';
+            const displayHour = hours % 12 === 0 ? 12 : hours % 12;
+            return period + ' ' + displayHour + ':' + minutes;
+        },
+
+        updateSendButtonState: function() {
+            const input = document.getElementById('trialInput');
+            const sendBtn = document.getElementById('trialSendBtn');
+
+            if (!input || !sendBtn) {
+                return;
+            }
+
+            const hasText = input.value.trim().length > 0;
+            sendBtn.disabled = this.sending || !hasText;
         },
 
         scrollToBottom: function() {
@@ -302,40 +918,91 @@
         }
     };
 
-    // jQuery 사용 가능하면 사용
     $(function() {
         trial.init();
     });
 </script>
 
-<div class="col-sm-10">
-    <div class="trial-container">
-        <!-- 헤더 -->
-        <div class="trial-header">
-            <h2>⚖️ 모의 법정 시스템</h2>
-            <p>AI 판사와 대화해보세요 <span style="font-size: 0.8em;">🧠 대화 기억 ON</span></p>
-        </div>
-
-        <!-- 채팅 영역 -->
-        <div class="chat-area" id="trialChatArea">
-            <div class="message ai">
-                <div class="message-avatar">판</div>
-                <div class="message-content">
-                    안녕하세요. 저는 AI 판사입니다.<br>
-                    무엇을 도와드릴까요?
+<div class="col-sm-12">
+    <div class="trial-shell">
+        <div class="trial-layout">
+            <aside class="trial-panel">
+                <div class="trial-panel__header">
+                    <h2>모의 재판 브리핑</h2>
+                    <p>각 참가자의 역할을 자유롭게 바꿔가며 사건의 흐름을 구성해보세요. AI 재판부가 전체 절차를 정리해 드립니다.</p>
+                    <div class="stage-indicator">사건 진행 제어판</div>
                 </div>
-            </div>
-        </div>
+                <div class="roles-panel">
+                    <div class="roles-panel__intro">
+                        <strong>발언 역할 선택</strong>
+                        <span>메시지를 보낼 때마다 원하는 역할을 눌러주세요.</span>
+                    </div>
+                    <div class="role-grid">
+                        <div class="role-card" data-role="judge" data-icon="⚖️">
+                            <h3>재판장</h3>
+                            <p>절차 진행과 판결 요지를 정리합니다.</p>
+                        </div>
+                        <div class="role-card" data-role="prosecutor" data-icon="🧾">
+                            <h3>검사</h3>
+                            <p>공소 사실과 증거를 제시하며 사건을 이끕니다.</p>
+                        </div>
+                        <div class="role-card" data-role="defender" data-icon="🛡️">
+                            <h3>변호인</h3>
+                            <p>피고인을 대변하고 반박 논리를 구성합니다.</p>
+                        </div>
+                        <div class="role-card" data-role="defendant" data-icon="👤">
+                            <h3>피고인</h3>
+                            <p>사건의 당사자로서 진술을 전달합니다.</p>
+                        </div>
+                        <div class="role-card" data-role="witness" data-icon="🗣️">
+                            <h3>증인</h3>
+                            <p>사실관계를 뒷받침할 증언을 남겨보세요.</p>
+                        </div>
+                        <div class="role-card" data-role="jury" data-icon="👥">
+                            <h3>참심위원</h3>
+                            <p>중립적 의견이나 평결 논의를 공유합니다.</p>
+                        </div>
+                    </div>
+                </div>
+            </aside>
 
-        <!-- 입력 영역 -->
-        <div class="input-area">
-            <div class="input-group-custom">
-                <input type="text"
-                       id="trialInput"
-                       placeholder="메시지를 입력하세요..."
-                       onkeypress="if(event.key==='Enter') trial.send()">
-                <button id="trialSendBtn" onclick="trial.send()">전송</button>
-            </div>
+            <section class="trial-panel chat-panel">
+                <div class="chat-panel__header">
+                    <div class="chat-panel__header-top">
+                        <h3 class="chat-title">모의 법정 대화</h3>
+                        <span class="case-chip">CASE PLAYGROUND</span>
+                    </div>
+                    <p>각 발언은 선택된 역할과 함께 기록됩니다. AI 재판부는 모든 메시지를 참조해 절차 요약과 판단 방향을 제시합니다.</p>
+                </div>
+
+                <div class="chat-area" id="trialChatArea" role="log" aria-live="polite" aria-label="모의 재판 대화 내용">
+                    <div class="message role-ai" style="--accent: #334155;">
+                        <div class="message-avatar" aria-hidden="true">AI</div>
+                        <div class="message-content">
+                            <span class="message-label">AI 재판부</span>
+                            <p class="message-text">안녕하세요. 모의 재판 진행을 돕는 AI 재판부입니다. 참가자 역할을 선택하고 발언을 남기시면 절차와 쟁점을 정리해 드립니다.</p>
+                            <span class="message-meta">방금</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="input-panel">
+                    <span class="active-role-chip" id="activeRoleChip">검사 발언 준비</span>
+                    <div class="input-group">
+                        <div class="input-field-wrapper">
+                            <label for="trialInput">선택한 역할의 발언 내용</label>
+                            <textarea id="trialInput"
+                                      placeholder="검사의 관점에서 메시지를 입력하세요..."
+                                      autocomplete="off"
+                                      aria-label="모의 재판 메시지 입력"></textarea>
+                        </div>
+                        <button type="button" id="trialSendBtn" onclick="trial.send()" aria-label="메시지 전송" disabled>
+                            발언 등록
+                            <span class="btn-icon">➤</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
         </div>
     </div>
 </div>

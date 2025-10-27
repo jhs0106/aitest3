@@ -71,7 +71,7 @@
         </ul>
         <ul class="navbar-nav">
             <li class="nav-item">
-                <a class="nav-link" href="<c:url value="/hauntedmanual"/>">괴담 규칙 매뉴얼</a>
+                <a class="nav-link" href="<c:url value="/hauntedmanual"/>">매뉴얼 괴담</a>
             </li>
         </ul>
     </div>

@@ -1,7 +1,10 @@
 package edu.sm.controller;
 
+import edu.sm.app.dto.Case;
 import edu.sm.app.service.Ai2IntegratedService;
+import edu.sm.app.service.CaseService;
 import edu.sm.app.service.TrialService;
+import edu.sm.app.service.TrialSessionManager;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +15,7 @@ import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -22,6 +26,8 @@ public class Ai2RestController {
 
     private final Ai2IntegratedService ai2IntegratedService;
     private final TrialService trialService;
+    private final CaseService caseService;
+    private final TrialSessionManager sessionManager;
 
     // ===== 기존 IoT 관련 엔드포인트 =====
     @GetMapping("/sensor-data")
@@ -82,14 +88,81 @@ public class Ai2RestController {
     // ===== 모의 법정 관련 엔드포인트 =====
 
     /**
-     * 기본 재판 채팅 (기존 메서드 유지)
+     * ⭐ 신규: 사건 목록 조회
+     */
+    @GetMapping("/trial-cases")
+    public List<Case> getTrialCases() {
+        try {
+            log.info("사건 목록 조회");
+            return caseService.getAllCases();
+        } catch (Exception e) {
+            log.error("사건 목록 조회 실패", e);
+            return List.of();
+        }
+    }
+
+    /**
+     * ⭐ 신규: 특정 사건 조회
+     */
+    @GetMapping("/trial-case/{caseId}")
+    public Case getTrialCase(@PathVariable Integer caseId) {
+        try {
+            log.info("사건 조회 - ID: {}", caseId);
+            return caseService.getCaseById(caseId);
+        } catch (Exception e) {
+            log.error("사건 조회 실패 - ID: {}", caseId, e);
+            return null;
+        }
+    }
+
+    /**
+     * ⭐ 신규: 사건 기반 재판 시작
+     */
+    @GetMapping(value = "/trial-start", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> startTrialWithCase(
+            @RequestParam("caseId") Integer caseId,
+            HttpSession session) {
+
+        String sessionId = session.getId();
+        log.info("사건 기반 재판 시작 - 사건ID: {}, 세션: {}", caseId, sessionId);
+
+        try {
+            Case trialCase = caseService.getCaseById(caseId);
+            if (trialCase == null) {
+                return Flux.just("오류: 사건을 찾을 수 없습니다.");
+            }
+
+            // 사건 상태를 'in_progress'로 업데이트
+            trialCase.setStatus("in_progress");
+            caseService.updateCase(trialCase);
+
+            return trialService.startTrialWithCase(trialCase, sessionId);
+
+        } catch (Exception e) {
+            log.error("재판 시작 실패", e);
+            return Flux.just("오류: 재판을 시작할 수 없습니다. " + e.getMessage());
+        }
+    }
+
+    /**
+     * 기본 재판 채팅 (기존 호환성 유지)
      */
     @GetMapping(value = "/trial-chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> trialChat(
             @RequestParam("message") String message,
-            @RequestParam(value = "role", required = false) String role) {
-        log.info("모의 법정 채팅 - 역할: {}, 메시지: {}", role, message);
-        return trialService.chat(message, role);
+            @RequestParam(value = "role", required = false) String role,
+            HttpSession session) {
+
+        String sessionId = session.getId();
+        log.info("재판 채팅 - 세션: {}, 역할: {}, 메시지: {}", sessionId, role, message);
+
+        // 세션에 사건이 설정되어 있으면 Memory 기반 사용
+        if (sessionManager.hasCase(sessionId)) {
+            return trialService.chatWithMemory(message, sessionId);
+        } else {
+            // 사건 없이 단순 채팅
+            return trialService.chat(message, role);
+        }
     }
 
     /**
@@ -131,60 +204,151 @@ public class Ai2RestController {
      * AI 자동 진행 - 검사/변호사 자동 발언
      */
     @GetMapping(value = "/trial-ai-proceed", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> trialAiProceed(
-            @RequestParam(value = "sessionId", required = false) String sessionId,
-            HttpSession session) {
-        String sid = sessionId != null ? sessionId : session.getId();
-        log.info("AI 자동 진행 - 세션ID: {}", sid);
-        return trialService.aiAutoProceed(sid);
+    public Flux<String> trialAiProceed(HttpSession session) {
+        String sessionId = session.getId();
+        log.info("AI 자동 진행 - 세션ID: {}", sessionId);
+        return trialService.aiAutoProceed(sessionId);
     }
 
     /**
      * 판결 생성 - Memory + RAG 기반
      */
     @GetMapping(value = "/trial-verdict", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> trialVerdict(
-            @RequestParam(value = "sessionId", required = false) String sessionId,
-            HttpSession session) {
-        String sid = sessionId != null ? sessionId : session.getId();
-        log.info("판결 생성 - 세션ID: {}", sid);
-        return trialService.generateVerdict(sid);
+    public Flux<String> trialVerdict(HttpSession session) {
+        String sessionId = session.getId();
+        log.info("판결 생성 - 세션ID: {}", sessionId);
+        return trialService.generateVerdict(sessionId);
     }
 
     /**
-     * 재판 종료
-     */
-    @PostMapping("/trial-complete")
-    public Map<String, Object> trialComplete(
-            @RequestParam(value = "sessionId", required = false) String sessionId,
-            HttpSession session) {
-        String sid = sessionId != null ? sessionId : session.getId();
-        log.info("재판 종료 - 세션ID: {}", sid);
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("message", "재판이 종료되었습니다.");
-        response.put("sessionId", sid);
-
-        return response;
-    }
-
-    /**
-     * 역할 전환
+     * ⭐ 개선: 역할 전환
      */
     @PostMapping("/trial-switch-role")
     public Map<String, Object> trialSwitchRole(
             @RequestParam("role") String role,
-            @RequestParam(value = "sessionId", required = false) String sessionId,
             HttpSession session) {
-        String sid = sessionId != null ? sessionId : session.getId();
-        log.info("역할 전환 - 세션ID: {}, 새 역할: {}", sid, role);
+
+        String sessionId = session.getId();
+        log.info("역할 전환 - 세션: {}, 새 역할: {}", sessionId, role);
 
         Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("newRole", role);
-        response.put("message", "역할이 " + role + "로 전환되었습니다.");
+
+        try {
+            // 역할 전환
+            sessionManager.switchRole(sessionId, role);
+
+            // 사건 정보 조회
+            Case trialCase = sessionManager.getCase(sessionId);
+
+            // 역할별 안내 메시지
+            String roleNameKorean = getRoleNameKorean(role);
+
+            String message;
+            if (trialCase != null) {
+                message = String.format("""
+                    🔄 역할이 %s(으)로 전환되었습니다.
+                    
+                    현재 재판 중인 사건:
+                    - 사건번호: %s
+                    - 피고인: %s
+                    - 혐의: %s
+                    
+                    %s의 관점에서 재판에 참여하실 수 있습니다.
+                    """,
+                        roleNameKorean,
+                        trialCase.getCaseNumber(),
+                        trialCase.getDefendant(),
+                        trialCase.getCharge(),
+                        roleNameKorean
+                );
+            } else {
+                message = String.format("역할이 %s(으)로 전환되었습니다.", roleNameKorean);
+            }
+
+            response.put("success", true);
+            response.put("newRole", role);
+            response.put("roleNameKorean", roleNameKorean);
+            response.put("message", message);
+            response.put("caseInfo", trialCase);
+
+        } catch (Exception e) {
+            log.error("역할 전환 실패", e);
+            response.put("success", false);
+            response.put("message", "역할 전환 중 오류가 발생했습니다.");
+        }
 
         return response;
+    }
+
+    /**
+     * ⭐ 신규: 재판 종료 및 세션 초기화
+     */
+    @PostMapping("/trial-complete")
+    public Map<String, Object> trialComplete(HttpSession session) {
+        String sessionId = session.getId();
+        log.info("재판 종료 - 세션: {}", sessionId);
+
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            // 사건 정보 조회
+            Case trialCase = sessionManager.getCase(sessionId);
+
+            if (trialCase != null) {
+                // 사건 상태를 'closed'로 업데이트
+                trialCase.setStatus("closed");
+                caseService.updateCase(trialCase);
+            }
+
+            // 세션 초기화
+            sessionManager.clearSession(sessionId);
+
+            response.put("success", true);
+            response.put("message", "재판이 종료되었습니다.");
+            response.put("caseNumber", trialCase != null ? trialCase.getCaseNumber() : null);
+
+        } catch (Exception e) {
+            log.error("재판 종료 실패", e);
+            response.put("success", false);
+            response.put("message", "재판 종료 중 오류가 발생했습니다.");
+        }
+
+        return response;
+    }
+
+    /**
+     * ⭐ 신규: 현재 세션 정보 조회
+     */
+    @GetMapping("/trial-session-info")
+    public Map<String, Object> getSessionInfo(HttpSession session) {
+        String sessionId = session.getId();
+
+        Map<String, Object> info = new HashMap<>();
+        info.put("sessionId", sessionId);
+        info.put("hasCase", sessionManager.hasCase(sessionId));
+        info.put("currentRole", sessionManager.getCurrentRole(sessionId));
+
+        Case trialCase = sessionManager.getCase(sessionId);
+        if (trialCase != null) {
+            info.put("caseNumber", trialCase.getCaseNumber());
+            info.put("defendant", trialCase.getDefendant());
+            info.put("charge", trialCase.getCharge());
+        }
+
+        return info;
+    }
+
+    // ===== Helper Methods =====
+
+    private String getRoleNameKorean(String roleId) {
+        return switch (roleId) {
+            case "judge" -> "판사";
+            case "prosecutor" -> "검사";
+            case "defender" -> "변호인";
+            case "defendant" -> "피고인";
+            case "witness" -> "증인";
+            case "jury" -> "참심위원";
+            default -> "참가자";
+        };
     }
 }

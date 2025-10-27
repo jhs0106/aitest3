@@ -17,12 +17,21 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.HashMap;
 import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
+import java.util.Objects;
 
 @Service
 public class HauntedManualEtlService {
 
     private static final List<String> SUPPORTED_EXTENSIONS = List.of(".txt", ".pdf", ".doc", ".docx");
+    private static final DocumentContentAccessor DOCUMENT_CONTENT_ACCESSOR = DocumentContentAccessor.resolve();
+    private static final DocumentMetadataAccessor DOCUMENT_METADATA_ACCESSOR = DocumentMetadataAccessor.resolve();
 
 
     private final VectorStore vectorStore;
@@ -39,22 +48,56 @@ public class HauntedManualEtlService {
         if (documents == null) {
             return String.format("지원하는 파일 형식(%s)을 업로드해주세요.", String.join(", ", SUPPORTED_EXTENSIONS));
         }
+        if (documents.isEmpty()) {
+            return "문서에서 추출한 내용이 없습니다. 다른 파일을 시도해 주세요.";
+        }
 
         String normalizedScenario = StringUtils.hasText(scenario) ? StringUtils.trimWhitespace(scenario) : "";
-
-        for (Document document : documents) {
-            if (StringUtils.hasText(normalizedScenario)) {
-                document.getMetadata().put("scenario", normalizedScenario);
-            }
+        String trimmedName = null;
+        String originalFilename = file.getOriginalFilename();
+        if (StringUtils.hasText(originalFilename)) {
+            trimmedName = StringUtils.trimWhitespace(originalFilename);
         }
 
         List<Document> chunks = transform(documents);
+        if (chunks == null || chunks.isEmpty()) {
+            return "문서를 분할할 수 없습니다. 다른 파일을 시도해 주세요.";
+        }
+
+        if (StringUtils.hasText(normalizedScenario) || StringUtils.hasText(trimmedName)) {
+            ListIterator<Document> iterator = chunks.listIterator();
+            while (iterator.hasNext()) {
+                Document chunk = iterator.next();
+                Map<String, Object> metadata = extractDocumentMetadata(chunk);
+                Map<String, Object> enrichedMetadata = metadata != null ? new HashMap<>(metadata) : new HashMap<>();
+                if (StringUtils.hasText(normalizedScenario)) {
+                    enrichedMetadata.put("scenario", normalizedScenario);
+                }
+                if (StringUtils.hasText(trimmedName)) {
+                    enrichedMetadata.put("source", trimmedName);
+                }
+                if (!Objects.equals(metadata, enrichedMetadata)) {
+                    iterator.set(new Document(extractDocumentContent(chunk), enrichedMetadata));
+                }
+            }
+        }
+
         vectorStore.add(chunks);
 
         StringBuilder message = new StringBuilder("괴담 규칙 문서를 벡터 저장소에 적재했습니다.");
-        if (StringUtils.hasText(normalizedScenario)) {
-            message.append(" (시나리오: ").append(normalizedScenario).append(")");
+        message.append(" (총 ").append(chunks.size()).append("개 청크");
+        boolean hasDetails = false;
+        if (StringUtils.hasText(trimmedName)) {
+            message.append(hasDetails ? ", " : ": ");
+            message.append("파일: ").append(trimmedName);
+            hasDetails = true;
         }
+        if (StringUtils.hasText(normalizedScenario)) {
+            message.append(hasDetails ? ", " : ": ");
+            message.append("시나리오: ").append(normalizedScenario);
+            hasDetails = true;
+        }
+        message.append(")");
         return message.toString();
     }
 
@@ -145,5 +188,144 @@ public class HauntedManualEtlService {
 
     private String escapeValue(String value) {
         return value.replace("'", "\\'");
+    }
+
+    private String extractDocumentContent(Document document) {
+        return DOCUMENT_CONTENT_ACCESSOR.read(document);
+    }
+
+    private Map<String, Object> extractDocumentMetadata(Document document) {
+        return DOCUMENT_METADATA_ACCESSOR.read(document);
+    }
+
+    private static final class DocumentContentAccessor {
+        private final Method getContentMethod;
+        private final Method contentMethod;
+        private final Field contentField;
+
+        private DocumentContentAccessor(Method getContentMethod, Method contentMethod, Field contentField) {
+            this.getContentMethod = getContentMethod;
+            this.contentMethod = contentMethod;
+            this.contentField = contentField;
+        }
+
+        private static DocumentContentAccessor resolve() {
+            Method getContent = resolveDocumentContentMethod("getContent");
+            Method content = resolveDocumentContentMethod("content");
+            Method getText = resolveDocumentContentMethod("getText");
+            Method text = resolveDocumentContentMethod("text");
+            Field field = resolveDocumentContentField("content");
+            Field textField = resolveDocumentContentField("text");
+            if (getContent == null && content == null && getText == null && text == null && field == null && textField == null) {
+                throw new IllegalStateException("문서 내용을 읽을 수 있는 접근자가 없습니다.");
+            }
+            Method primaryMethod = firstNonNull(getContent, content, getText, text);
+            Method secondaryMethod = primaryMethod == getContent
+                    ? firstNonNull(content, getText, text)
+                    : primaryMethod == content
+                    ? firstNonNull(getText, text)
+                    : primaryMethod == getText
+                    ? text
+                    : null;
+            Field resolvedField = field != null ? field : textField;
+            return new DocumentContentAccessor(primaryMethod, secondaryMethod, resolvedField);
+        }
+
+        private String read(Document document) {
+            try {
+                if (getContentMethod != null) {
+                    return (String) getContentMethod.invoke(document);
+                }
+                if (contentMethod != null) {
+                    return (String) contentMethod.invoke(document);
+                }
+                return (String) contentField.get(document);
+            } catch (IllegalAccessException | InvocationTargetException ex) {
+                throw new IllegalStateException("문서 내용을 읽을 수 없습니다.", ex);
+            }
+        }
+
+        private static Method resolveDocumentContentMethod(String methodName) {
+            try {
+                return Document.class.getMethod(methodName);
+            } catch (NoSuchMethodException ex) {
+                return null;
+            }
+        }
+
+        private static Field resolveDocumentContentField(String fieldName) {
+            try {
+                Field field = Document.class.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                return field;
+            } catch (NoSuchFieldException | SecurityException ex) {
+                return null;
+            }
+        }
+
+        @SafeVarargs
+        private static <T> T firstNonNull(T... values) {
+            for (T value : values) {
+                if (value != null) {
+                    return value;
+                }
+            }
+            return null;
+        }
+    }
+
+    private static final class DocumentMetadataAccessor {
+        private final Method getMetadataMethod;
+        private final Method metadataMethod;
+        private final Field metadataField;
+
+        private DocumentMetadataAccessor(Method getMetadataMethod, Method metadataMethod, Field metadataField) {
+            this.getMetadataMethod = getMetadataMethod;
+            this.metadataMethod = metadataMethod;
+            this.metadataField = metadataField;
+        }
+
+        private static DocumentMetadataAccessor resolve() {
+            Method getMetadata = resolveDocumentMetadataMethod("getMetadata");
+            Method metadata = resolveDocumentMetadataMethod("metadata");
+            Field field = resolveDocumentMetadataField();
+            if (getMetadata == null && metadata == null && field == null) {
+                throw new IllegalStateException("문서 메타데이터를 읽을 수 있는 접근자가 없습니다.");
+            }
+            return new DocumentMetadataAccessor(getMetadata, metadata, field);
+        }
+
+        @SuppressWarnings("unchecked")
+        private Map<String, Object> read(Document document) {
+            try {
+                if (getMetadataMethod != null) {
+                    return (Map<String, Object>) getMetadataMethod.invoke(document);
+                }
+                if (metadataMethod != null) {
+                    return (Map<String, Object>) metadataMethod.invoke(document);
+                }
+                return (Map<String, Object>) metadataField.get(document);
+            } catch (IllegalAccessException | InvocationTargetException ex) {
+                throw new IllegalStateException("문서 메타데이터를 읽을 수 없습니다.", ex);
+            }
+        }
+
+        private static Method resolveDocumentMetadataMethod(String methodName) {
+            try {
+                return Document.class.getMethod(methodName);
+            } catch (NoSuchMethodException ex) {
+                return null;
+            }
+        }
+
+        private static Field resolveDocumentMetadataField() {
+            try {
+                Field field = Document.class.getDeclaredField("metadata");
+                field.setAccessible(true);
+                return field;
+            } catch (NoSuchFieldException | SecurityException ex) {
+                return null;
+            }
+        }
     }
 }

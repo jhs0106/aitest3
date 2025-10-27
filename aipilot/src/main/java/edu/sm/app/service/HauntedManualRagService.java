@@ -33,15 +33,13 @@ public class HauntedManualRagService {
     }
 
     public ManualStartResponse startScenario(String scenario,
-                                             String zone,
                                              String rumor) {
         String trimmedScenario = StringUtils.hasText(scenario) ? StringUtils.trimWhitespace(scenario) : "폐교";
-        String trimmedZone = StringUtils.hasText(zone) ? StringUtils.trimWhitespace(zone) : "";
         String trimmedRumor = StringUtils.hasText(rumor) ? StringUtils.trimWhitespace(rumor) : "";
 
         String conversationId = generateConversationId(trimmedScenario);
-        String prompt = buildManualPrimer(trimmedScenario, trimmedZone, trimmedRumor);
-        QuestionAnswerAdvisor advisor = etlService.createAdvisor(trimmedScenario, trimmedZone);
+        String prompt = buildManualPrimer(trimmedScenario, trimmedRumor);
+        QuestionAnswerAdvisor advisor = etlService.createAdvisor(trimmedScenario);
         String manual = callModel(prompt, conversationId, advisor);
 
         return new ManualStartResponse(conversationId, trimmedScenario, manual);
@@ -50,7 +48,6 @@ public class HauntedManualRagService {
     public ManualAnswerResponse answerManual(String conversationId,
                                              String question,
                                              String scenario,
-                                             String zone,
                                              String rumor) {
         if (!StringUtils.hasText(conversationId)) {
             throw new IllegalArgumentException("conversationId가 필요합니다. 시나리오를 다시 시작하세요.");
@@ -59,11 +56,10 @@ public class HauntedManualRagService {
             throw new IllegalArgumentException("질문이 비어 있습니다.");
         }
         String trimmedScenario = StringUtils.hasText(scenario) ? StringUtils.trimWhitespace(scenario) : "폐교";
-        String trimmedZone = StringUtils.hasText(zone) ? StringUtils.trimWhitespace(zone) : "";
         String trimmedRumor = StringUtils.hasText(rumor) ? StringUtils.trimWhitespace(rumor) : "";
 
-        String prompt = buildFollowUpPrompt(trimmedScenario, trimmedZone, trimmedRumor, question);
-        QuestionAnswerAdvisor advisor = etlService.createAdvisor(trimmedScenario, trimmedZone);
+        String prompt = buildFollowUpPrompt(trimmedScenario, trimmedRumor, question);
+        QuestionAnswerAdvisor advisor = etlService.createAdvisor(trimmedScenario);
         String answer = callModel(prompt, conversationId, advisor);
 
         return new ManualAnswerResponse(answer);
@@ -81,7 +77,6 @@ public class HauntedManualRagService {
     }
 
     private String buildManualPrimer(String scenario,
-                                     String zone,
                                      String rumor) {
         StringBuilder builder = new StringBuilder();
         builder.append("당신은 ")
@@ -94,9 +89,6 @@ public class HauntedManualRagService {
                 .append("4. 열린 결말: '결말 미확정' 등으로 마무리\n")
                 .append("각 단락 사이에는 — 구분선을 넣으세요.\n")
                 .append("새 근무자는 이 매뉴얼을 숙지하고 질문을 시작합니다.");
-        if (StringUtils.hasText(zone)) {
-            builder.append("\n감시 구역: ").append(zone);
-        }
         if (StringUtils.hasText(rumor)) {
             builder.append("\n최신 소문: ").append(rumor)
                     .append("\n(소문은 사실이 아닐 수 있음을 상기시키세요.)");
@@ -105,7 +97,6 @@ public class HauntedManualRagService {
     }
 
     private String buildFollowUpPrompt(String scenario,
-                                       String zone,
                                        String rumor,
                                        String question) {
         StringBuilder builder = new StringBuilder();
@@ -120,9 +111,6 @@ public class HauntedManualRagService {
                 .append("각 단락 사이에는 — 구분선을 넣으세요.\n")
                 .append("사용자 질문: ")
                 .append(question);
-        if (StringUtils.hasText(zone)) {
-            builder.append("\n참조 구역: ").append(zone);
-        }
         if (StringUtils.hasText(rumor)) {
             builder.append("\n최신 소문: ").append(rumor)
                     .append("\n(소문은 사실이 아닐 수 있음을 상기시키세요.)");

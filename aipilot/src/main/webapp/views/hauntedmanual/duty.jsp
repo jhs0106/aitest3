@@ -1,4 +1,3 @@
-
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 
@@ -29,7 +28,6 @@
     },
     handleQuestion: async function () {
       const scenario = $('#scenarioSelect').val().trim();
-      const zone = $('#dutyZone').val().trim();
       const rumor = $('#dutyRumor').val().trim();
       const question = $('#dutyQuestion').val().trim();
 
@@ -39,7 +37,7 @@
       }
 
       if (!this.conversationId || scenario !== this.currentScenario) {
-        await this.startScenario(scenario, zone, rumor);
+        await this.startScenario(scenario, rumor);
       }
 
       if (!question) {
@@ -47,15 +45,12 @@
       }
 
       this.appendUser(question);
-      await this.sendQuestion(question, scenario, zone, rumor);
+      await this.sendQuestion(question, scenario, rumor);
     },
-    startScenario: async function (scenario, zone, rumor) {
+    startScenario: async function (scenario, rumor) {
       this.resetStory();
       const params = new URLSearchParams();
       params.append('scenario', scenario);
-      if (zone) {
-        params.append('zone', zone);
-      }
       if (rumor) {
         params.append('rumor', rumor);
       }
@@ -81,14 +76,11 @@
         throw error;
       }
     },
-    sendQuestion: async function (question, scenario, zone, rumor) {
+    sendQuestion: async function (question, scenario, rumor) {
       const params = new URLSearchParams();
       params.append('conversationId', this.conversationId);
       params.append('question', question);
       params.append('scenario', scenario);
-      if (zone) {
-        params.append('zone', zone);
-      }
       if (rumor) {
         params.append('rumor', rumor);
       }
@@ -183,10 +175,7 @@
         <div class="col-sm-5 my-1">
           <select class="form-control" id="scenarioSelect"></select>
         </div>
-        <div class="col-sm-3 my-1">
-          <input type="text" class="form-control" id="dutyZone" placeholder="필요 시 구역 지정"/>
-        </div>
-        <div class="col-sm-3 my-1">
+        <div class="col-sm-6 my-1">
           <input type="text" class="form-control" id="dutyRumor" placeholder="최신 소문"/>
         </div>
         <div class="col-sm-1 my-1 text-right">

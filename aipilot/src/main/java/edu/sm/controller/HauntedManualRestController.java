@@ -21,9 +21,8 @@ public class HauntedManualRestController {
 
     @PostMapping("/upload")
     public String upload(@RequestParam("scenario") String scenario,
-                         @RequestParam("zone") String zone,
                          @RequestParam("attach") MultipartFile attach) throws Exception {
-        return etlService.ingestManual(scenario, zone, attach);
+        return etlService.ingestManual(scenario, attach);
     }
 
     @PostMapping("/clear")
@@ -37,19 +36,22 @@ public class HauntedManualRestController {
         return etlService.listScenarios();
     }
 
+    @GetMapping("/supported-types")
+    public List<String> supportedTypes() {
+        return etlService.supportedExtensions();
+    }
+
     @PostMapping("/start")
     public ManualStartResponse start(@RequestParam(value = "scenario", required = false) String scenario,
-                                     @RequestParam(value = "zone", required = false) String zone,
                                      @RequestParam(value = "rumor", required = false) String rumor) {
-        return ragService.startScenario(scenario, zone, rumor);
+        return ragService.startScenario(scenario, rumor);
     }
 
     @PostMapping("/ask")
     public ManualAnswerResponse ask(@RequestParam("conversationId") String conversationId,
                                     @RequestParam("question") String question,
                                     @RequestParam(value = "scenario", required = false) String scenario,
-                                    @RequestParam(value = "zone", required = false) String zone,
                                     @RequestParam(value = "rumor", required = false) String rumor) {
-        return ragService.answerManual(conversationId, question, scenario, zone, rumor);
+        return ragService.answerManual(conversationId, question, scenario, rumor);
     }
 }

@@ -6,6 +6,7 @@
     currentScenario: '',
     init: function () {
       this.loadScenarioOptions();
+      this.loadSupportedTypes();
       $('#scenarioApplyBtn').on('click', () => this.applyScenario());
       $('#scenarioName').on('keypress', (event) => {
         if (event.key === 'Enter') {
@@ -32,6 +33,19 @@
         console.error('loadScenarioOptions error', error);
       }
     },
+    loadSupportedTypes: async function () {
+      try {
+        const response = await fetch('/api/haunted/manual/supported-types');
+        if (!response.ok) {
+          return;
+        }
+        const types = await response.json();
+        const container = $('#supportedTypes');
+        container.text(types.join(', '));
+      } catch (error) {
+        console.error('loadSupportedTypes error', error);
+      }
+    },
     applyScenario: function () {
       const raw = $('#scenarioName').val().trim();
       if (!raw) {
@@ -46,19 +60,13 @@
         alert('시나리오를 먼저 적용하세요.');
         return;
       }
-      const zone = $('#manualZone').val().trim();
       const file = document.getElementById('manualFile').files[0];
-      if (!zone) {
-        alert('구역 정보를 입력하세요.');
-        return;
-      }
       if (!file) {
         alert('업로드할 문서를 선택하세요.');
         return;
       }
       const formData = new FormData();
       formData.append('scenario', this.currentScenario);
-      formData.append('zone', zone);
       formData.append('attach', file);
       try {
         const response = await fetch('/api/haunted/manual/upload', {
@@ -134,11 +142,7 @@
     <div class="card-header bg-secondary text-white">문서 업로드</div>
     <div class="card-body">
       <div class="form-row align-items-center">
-        <div class="col-sm-3 my-1">
-          <label class="sr-only" for="manualZone">구역</label>
-          <input type="text" class="form-control" id="manualZone" placeholder="예) 본관 3층"/>
-        </div>
-        <div class="col-sm-4 my-1">
+        <div class="col-sm-5 my-1">
           <input type="file" class="form-control-file" id="manualFile" accept=".txt,.pdf,.doc,.docx"/>
         </div>
         <div class="col-sm-3 my-1">
@@ -148,7 +152,8 @@
           <button type="button" class="btn btn-outline-light btn-block" id="clearBtn">벡터 초기화</button>
         </div>
       </div>
-      <small class="form-text text-muted">업로드한 문서는 시나리오와 구역 메타데이터를 포함해 자동으로 분할 저장됩니다.</small>
+      <small class="form-text text-muted">업로드한 문서는 시나리오 메타데이터와 함께 자동으로 분할 저장됩니다.</small>
+      <small class="form-text text-muted">지원 파일 형식: <span id="supportedTypes">.txt, .pdf, .doc, .docx</span></small>
     </div>
   </div>
 

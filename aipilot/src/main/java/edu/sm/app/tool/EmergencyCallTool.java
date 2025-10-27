@@ -15,7 +15,7 @@ public class EmergencyCallTool {
             @ToolParam(description = "CCTV 위치 또는 상황 설명", required = true) String location) {
 
         String confirmation = String.format(
-                "112에 신고하는 중... [시뮬레이션] 재난 유형: %s, 위치/상황: %s",
+                "119에 신고하는 중... [시뮬레이션] 재난 유형: %s, 위치/상황: %s",
                 disasterType, location);
         log.warn(confirmation); // 실제 신고 대신 로그 기록
         return "🚨 " + confirmation; // AI 응답에 포함될 문자열

@@ -198,6 +198,8 @@
 | POST | /ai2/api/clear-vector | 벡터 저장소 초기화 |
 | GET | /ai2/api/device-status | 디바이스 상태 조회 |
 
+오늘의 센서 데이터 조회
+음성 명령 처리
 ## 5. Ai 세차장 시스템 (사용자)
 이 기능은 AI가 번호판·차량 사진을 분석해 **입차 → 세차 계획/실행 → 출차**까지 자동화하며, @Tool 로 **차단봉(게이트)**을 제어함.
 
@@ -219,6 +221,57 @@
 - 버튼 클릭 시 **장치 제어 서비스 호출** 및 **로그 기록**
 - **출차 시각/게이트 조작 내역**을 누적 카드로 확인 가능
 
+### 데이터베이스 구조 (vehicle)
+| 필드명 | 타입 | 설명                                 |
+|--------|------|------------------------------------|
+| plate | TEXT (PK) | 번호판                                |
+| customer_id | BIGINT | 고객 ID                     |
+| model | TEXT | 차종                                 |
+| size | TEXT | 차량 크기 분류 (compact, midsize, suv 등) |
+| color | TEXT | 차량 색상 (black, white등등)             |
+| last_wash_at | TIMESTAMP | 마지막 세차 시각       |
+
+
+### 데이터베이스 구조 (wash_order)
+| 필드명 | 타입 | 설명           |
+|--------|------|--------------|
+| id | TEXT (PK) | 주문번호         |
+| plate | TEXT | 차량 번호판       |
+| recipe_json | TEXT | LLM이 생성한 전체 세차 레시피 JSON |
+| status | TEXT | 주문 상태 (RUNNING, DONE 등) |
+| price | INTEGER | 예상 금액        |
+| eta_min | INTEGER | 예상 소요 시간(분)  |
+| created_at | TIMESTAMP | 생성 일시       |
+
+
+### 데이터베이스 구조 (wash_log)
+| 필드명 | 타입 | 설명 |
+|--------|------|------|
+| id | BIGSERIAL (PK) | 로그 ID |
+| order_id | TEXT | 주문번호  |
+| step_idx | INTEGER | 단계 인덱스 (0, 1, 2, …) |
+| step_name | TEXT | 단계 이름 |
+| started_at | TIMESTAMP | 실제 시작 시각 |
+| ended_at | TIMESTAMP | 실제 종료 시각  |
+| pressure_bar | INTEGER | 계획/실제 압력 |
+| chem_code | TEXT | 계획/실제 케미컬 코드 |
+| result | TEXT | 단계 결과  |
+
+### 데이터베이스 구조 (carwash_gate_log)
+| 필드명 | 타입 | 설명 |
+|--------|------|------|
+| id | BIGSERIAL (PK) | 게이트 로그 ID |
+| plate | TEXT | 번호판 |
+| event_type | TEXT | 이벤트 유형 (ENTRY 또는 EXIT) |
+| logged_at | TIMESTAMP | 기록 시각  |
+
+### 주요 API 엔드포인트 (사용자)
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| POST | /ai6/entry-image | 입차 처리 |
+| POST | /ai6/entry-gate-open | 입차용 수동 차단봉 오픈 |
+| POST | /ai6/plan-image | 세차 레시피 생성/실행 |
+| POST | /ai6/exit-gate | 출차 게이트 제어 |
 
 ---
 
@@ -250,6 +303,14 @@
 - 응답 형식 고정: **현황 요약 → 원인 가능성 → 우선 조치 제안**
 - 카드로 누적되어 **대화형 리포팅** 제공
 
+### 주요 API 엔드포인트 (관리자)
+| 메서드 | 경로 | 설명             |
+|--------|------|----------------|
+| GET | /ai6/admin/summary/today | 오늘의 KPI 요약 지표 조회 |
+| POST | /ai6/admin/owner-ask | 사장님 질의 -> AI 보고서 생성 |
+| GET | /ai6/admin/gate-logs | 최근 게이트 로그 조회   |
+| GET | /ai6/admin/vehicles | 등록된 차량 목록 전체 조회 |
+| GET | /ai6/admin/orders | 최근 세차 주문 20건 조회 |
 
 ---
 
@@ -276,6 +337,13 @@ AI가 **실시간 CCTV 프레임**을 분석해 **화재/사고/응급** 등 위
 - **음성/시각 알림**으로 즉시 인지
 - 관리자 페이지에서 **기간별 통계, 오탐률, 평균 감지 시간** 대시보드 제공
 
+### 데이터베이스 구조 (door_user)
+| 필드명 | 타입 | 설명            |
+|--------|------|---------------|
+| id | BIGSERIAL (PK) | 사용자 고유 ID     |
+| name | VARCHAR(100)  | 사용자 이름        |
+| face_signature | TEXT  | AI가 추출한 얼굴 특징 |
+| created_at | TIMESTAMP | 생성 시각         |
 
 ---
 
@@ -300,3 +368,10 @@ AI가 **실시간 CCTV 프레임**을 분석해 **화재/사고/응급** 등 위
 - 성공/실패에 따라 **행 색상 구분**
 - 관리자 화면에서 **기간별 통계(시도 수, 성공률, 사용자별 빈도)** 제공
 
+### 데이터베이스 구조 (door_access_record)
+| 필드명 | 타입 | 설명 |
+|--------|------|------|
+| id | BIGSERIAL (PK) | 출입 기록 고유 ID |
+| name | VARCHAR(100)  | 출입 시도 사용자 이름 |
+| status | VARCHAR(10)  | 출입 결과 상태  |
+| access_time | TIMESTAMP | 출입 시각  |

@@ -22,6 +22,9 @@ import java.util.List;
 @Service
 public class HauntedManualEtlService {
 
+    private static final List<String> SUPPORTED_EXTENSIONS = List.of(".txt", ".pdf", ".doc", ".docx");
+
+
     private final VectorStore vectorStore;
     private final JdbcTemplate jdbcTemplate;
 
@@ -31,21 +34,17 @@ public class HauntedManualEtlService {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public String ingestManual(String scenario, String zone, MultipartFile file) throws IOException {
+    public String ingestManual(String scenario, MultipartFile file) throws IOException {
         List<Document> documents = extract(file);
         if (documents == null) {
-            return ".txt, .pdf, .doc, .docx 파일 중 하나를 업로드해주세요.";
+            return String.format("지원하는 파일 형식(%s)을 업로드해주세요.", String.join(", ", SUPPORTED_EXTENSIONS));
         }
 
         String normalizedScenario = StringUtils.hasText(scenario) ? StringUtils.trimWhitespace(scenario) : "";
-        String normalizedZone = StringUtils.hasText(zone) ? StringUtils.trimWhitespace(zone) : "";
 
         for (Document document : documents) {
             if (StringUtils.hasText(normalizedScenario)) {
                 document.getMetadata().put("scenario", normalizedScenario);
-            }
-            if (StringUtils.hasText(normalizedZone)) {
-                document.getMetadata().put("zone", normalizedZone);
             }
         }
 
@@ -56,9 +55,6 @@ public class HauntedManualEtlService {
         if (StringUtils.hasText(normalizedScenario)) {
             message.append(" (시나리오: ").append(normalizedScenario).append(")");
         }
-        if (StringUtils.hasText(normalizedZone)) {
-            message.append(" (구역: ").append(normalizedZone).append(")");
-        }
         return message.toString();
     }
 
@@ -66,7 +62,7 @@ public class HauntedManualEtlService {
         jdbcTemplate.update("TRUNCATE TABLE vector_store");
     }
 
-    public QuestionAnswerAdvisor createAdvisor(String scenario, String zone) {
+    public QuestionAnswerAdvisor createAdvisor(String scenario) {
         SearchRequest.Builder requestBuilder = SearchRequest.builder()
                 .similarityThreshold(0.0)
                 .topK(3);
@@ -75,14 +71,6 @@ public class HauntedManualEtlService {
         if (StringUtils.hasText(scenario)) {
             filterBuilder.append("scenario == '")
                     .append(escapeValue(StringUtils.trimWhitespace(scenario)))
-                    .append("'");
-        }
-        if (StringUtils.hasText(zone)) {
-            if (filterBuilder.length() > 0) {
-                filterBuilder.append(" && ");
-            }
-            filterBuilder.append("zone == '")
-                    .append(escapeValue(StringUtils.trimWhitespace(zone)))
                     .append("'");
         }
         if (filterBuilder.length() > 0) {
@@ -94,17 +82,28 @@ public class HauntedManualEtlService {
                 .build();
     }
 
+    /**
+     * 업로드 화면에서 datalist 옵션을 채우기 위해 벡터스토어에 이미 적재된 시나리오 이름을 반환한다.
+     * <p>
+     * 사용자가 과거에 등록했던 시나리오를 다시 선택할 수 있도록 프런트엔드가 호출한다.
+     * </p>
+     */
     public List<String> listScenarios() {
         return jdbcTemplate.query(
-                "SELECT DISTINCT metadata->>'scenario' AS scenario " +
+                "SELECT DISTINCT TRIM(metadata->>'scenario') AS scenario " +
                         "FROM vector_store " +
-                        "WHERE metadata ? 'scenario' AND metadata->>'scenario' IS NOT NULL " +
+                        "WHERE metadata->>'scenario' IS NOT NULL " +
+                        "AND TRIM(metadata->>'scenario') <> '' " +
                         "ORDER BY scenario",
                 (rs, rowNum) -> {
                     String value = rs.getString("scenario");
                     return value != null ? StringUtils.trimWhitespace(value) : value;
                 }
         );
+    }
+
+    public List<String> supportedExtensions() {
+        return SUPPORTED_EXTENSIONS;
     }
 
     private List<Document> extract(MultipartFile file) throws IOException {

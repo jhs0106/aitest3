@@ -1,13 +1,7 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%@ page isELIgnored="true" %>
-<style>
-  #to {
-    width: 400px;
-    height: 200px;
-    overflow: auto;
-    border: 2px solid green;
-  }
+
 </style>
 <script>
   document.addEventListener('DOMContentLoaded', () => {

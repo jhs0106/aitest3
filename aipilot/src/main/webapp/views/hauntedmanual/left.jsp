@@ -14,6 +14,6 @@
     <div class="alert alert-dark" role="alert">
         <strong>Tip</strong>
         <p class="mb-1">새 프로젝트에서도 시나리오를 생성하고 근무 세션을 별도로 시작할 수 있도록 분리했습니다.</p>
-        <small>첫 응답은 근무 매뉴얼이니, 근무 시작 후 질문을 이어가 보세요.</small>
+        <small>시나리오 이름은 직접 입력하면 되며, 첫 응답은 근무 매뉴얼입니다.</small>
     </div>
 </div>

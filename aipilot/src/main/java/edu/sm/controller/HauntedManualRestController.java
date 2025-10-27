@@ -31,11 +31,6 @@ public class HauntedManualRestController {
         return "괴담 규칙 벡터 저장소를 초기화했습니다.";
     }
 
-    @GetMapping("/scenarios")
-    public List<String> scenarios() {
-        return etlService.listScenarios();
-    }
-
     @GetMapping("/supported-types")
     public List<String> supportedTypes() {
         return etlService.supportedExtensions();

@@ -48,7 +48,7 @@ https://www.youtube.com/watch?v=zlSSEia3yD0
 
 ### 주요 기능 (Setup: 상황 & 문서 업로드)
 - **매뉴얼 설정**: 시나리오 이름을 입력 후 적용하면 현재 선택된 매뉴얼 뱃지와 로그에 반영. // 위치: aipilot/src/main/webapp/views/hauntedmanual/setup.jsp, aipilot/src/main/webapp/views/hauntedmanual/setup.jsp
-- **지원 형식 조회**: `/api/haunted/manual/supported-types`를 호출해 업로드 가능한 파일 확장자를 표시. //위치: aipilot/src/main/webapp/views/hauntedmanual/setup.jsp, aipilot/src/main/webapp/views/hauntedmanual/setup.jsp†
+- **지원 형식 조회**: `/api/haunted/manual/supported-types`를 호출해 업로드 가능한 파일 확장자를 표시. //위치: aipilot/src/main/webapp/views/hauntedmanual/setup.jsp, aipilot/src/main/webapp/views/hauntedmanual/setup.jsp
 - **문서 업로드 & 로그**: 선택한 매뉴얼과 파일을 `/api/haunted/manual/upload`에 전송하고 처리 결과를 근무자/시스템 로그 카드로 누적 // 위치: aipilot/src/main/webapp/views/hauntedmanual/setup.jsp, aipilot/src/main/webapp/views/hauntedmanual/setup.jsp
 - **벡터 저장소 초기화**: `/api/haunted/manual/clear` 호출로 규칙 벡터스토어를 초기화하고 로그로 //위치:aipilot/src/main/webapp/views/hauntedmanual/setup.jsp, aipilot/src/main/webapp/views/hauntedmanual/setup.jsp
 

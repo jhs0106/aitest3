@@ -20,7 +20,7 @@ https://www.youtube.com/watch?v=zlSSEia3yD0
 - DEV
 
 3. 이승호(lsh030412)         <https://github.com/lsh030412>
-- DEV
+- DEV, readme.md 작성
 ***
 # 기능 설명
 ## 1. AI1 자가 상담
